@@ -1,0 +1,285 @@
+/* ========================================================
+   MKB Mobile & PWA Responsive Styling
+   Optimized for Smartphones and Touch Devices
+   ======================================================== */
+
+/* Prevent auto-zoom on input focus in iOS Safari */
+@media (max-width: 767.98px) {
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    input[type="tel"],
+    select.form-control,
+    select.form-select,
+    textarea.form-control {
+        font-size: 16px !important;
+    }
+}
+
+/* Horizontal Scrollable Tabs on Mobile */
+@media (max-width: 767.98px) {
+    .nav-pills {
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+        gap: 6px;
+    }
+    .nav-pills .nav-item {
+        flex: 0 0 auto;
+    }
+    .nav-pills .nav-link {
+        white-space: nowrap;
+        font-size: 0.82rem !important;
+        padding: 6px 12px !important;
+    }
+
+    /* Stat Cards adjustments */
+    .stat-card {
+        margin-bottom: 8px;
+    }
+    .stat-value {
+        font-size: 1.2rem !important;
+    }
+
+    /* Page title on mobile */
+    .content-header .page-title {
+        font-size: 1.05rem !important;
+    }
+    .content-header .header-actions {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+    }
+    .content-header .header-actions .btn {
+        flex: 1 1 auto;
+        font-size: 0.8rem;
+    }
+}
+
+/* ========================================================
+   Quick Filter Bar & Dropdowns (Prevent Horizontal Overflow)
+   ======================================================== */
+#filterCategory,
+#filterAgingStatus,
+#filterMonth,
+#filterYear {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+@media (min-width: 768px) {
+    #filterCategory {
+        max-width: 220px;
+    }
+    #filterAgingStatus {
+        max-width: 190px;
+    }
+    #filterMonth {
+        max-width: 150px;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .filter-wrapper {
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+        margin-top: 10px !important;
+        margin-left: 0 !important;
+    }
+
+    .filter-wrapper .badge {
+        align-self: flex-start !important;
+        margin-bottom: 2px !important;
+    }
+
+    .filter-wrapper .input-group {
+        width: 100% !important;
+        max-width: 100% !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+    }
+
+    .filter-wrapper .input-group .input-group-text {
+        flex: 0 0 100px !important;
+        max-width: 100px !important;
+        font-size: 0.78rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+
+    .filter-wrapper .input-group select,
+    .filter-wrapper .input-group .form-select,
+    .filter-wrapper .input-group input {
+        flex: 1 1 auto !important;
+        width: 1% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        font-size: 0.8125rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .filter-wrapper #btnToggleMobileCards,
+    .filter-wrapper #btnReloadTable {
+        width: 100% !important;
+    }
+}
+
+
+/* ========================================================
+   Mobile Card View for DataTables & Financial Tables
+   ======================================================== */
+@media (max-width: 767.98px) {
+    .table-mobile-cards:not(.force-table-view) {
+        border: none !important;
+    }
+
+    .table-mobile-cards:not(.force-table-view) thead {
+        display: none !important;
+    }
+
+    .table-mobile-cards:not(.force-table-view) tbody {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    .table-mobile-cards:not(.force-table-view) tbody tr {
+        display: block !important;
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 10px !important;
+        margin-bottom: 12px !important;
+        padding: 12px 14px !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.04) !important;
+        position: relative;
+    }
+
+    .table-mobile-cards:not(.force-table-view) tbody tr:hover {
+        background-color: #f8fafc !important;
+    }
+
+    .table-mobile-cards:not(.force-table-view) tbody td {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 7px 0 !important;
+        border: none !important;
+        border-bottom: 1px dashed #edf2f7 !important;
+        text-align: right !important;
+        min-height: 32px;
+    }
+
+    .table-mobile-cards:not(.force-table-view) tbody td:last-child {
+        border-bottom: none !important;
+        padding-top: 10px !important;
+        padding-bottom: 2px !important;
+        justify-content: flex-end !important;
+        gap: 6px;
+    }
+
+    .table-mobile-cards:not(.force-table-view) tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #64748b;
+        font-size: 0.78rem;
+        text-align: left;
+        margin-right: 12px;
+        flex-shrink: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    /* When cell has no label (like actions or index) */
+    .table-mobile-cards:not(.force-table-view) tbody td[data-label=""]::before,
+    .table-mobile-cards:not(.force-table-view) tbody td:not([data-label])::before {
+        display: none !important;
+    }
+
+    /* Index number badge */
+    .table-mobile-cards:not(.force-table-view) tbody td.td-index {
+        position: absolute;
+        top: 10px;
+        left: 12px;
+        padding: 0 !important;
+        border: none !important;
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+}
+
+/* ========================================================
+   Floating Action Button (FAB) for Mobile Quick Entry
+   ======================================================== */
+.mobile-fab-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1040;
+}
+
+.mobile-fab-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45);
+    border: none;
+    font-size: 1.4rem;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.mobile-fab-btn:active {
+    transform: scale(0.92);
+}
+
+.mobile-fab-btn:hover {
+    color: #ffffff;
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.55);
+}
+
+/* ========================================================
+   PWA Installation Banner
+   ======================================================== */
+.pwa-install-banner {
+    display: none;
+    position: fixed;
+    bottom: 15px;
+    left: 15px;
+    right: 15px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    padding: 12px 16px;
+    z-index: 1050;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pwa-install-banner.show {
+    display: flex;
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+

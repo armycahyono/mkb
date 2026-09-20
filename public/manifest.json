@@ -1,0 +1,25 @@
+{
+  "name": "MKB - Manajemen Keuangan BOSP & Sekolah",
+  "short_name": "MKB Mobile",
+  "description": "Sistem Manajemen Keuangan BOSP dan Kas Operasional Sekolah",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F8FC",
+  "theme_color": "#3B82F6",
+  "icons": [
+    {
+      "src": "/img/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/img/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
