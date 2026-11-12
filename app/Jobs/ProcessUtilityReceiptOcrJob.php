@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Http\Controllers\UtilityReceiptController;
 use App\Models\UtilityReceipt;
 use App\Services\UtilityReceiptOcrService;
 use Exception;
@@ -44,7 +45,11 @@ class ProcessUtilityReceiptOcrJob implements ShouldQueue
 
         try {
             $filePath = Storage::disk('public')->path($this->receipt->receipt_file);
-            $result = $ocrService->scan($filePath);
+            $rawText = null;
+            if (! empty($this->receipt->ocr_raw_data)) {
+                $rawText = is_string($this->receipt->ocr_raw_data) ? $this->receipt->ocr_raw_data : json_encode($this->receipt->ocr_raw_data);
+            }
+            $result = $ocrService->scan($filePath, $rawText);
 
             // Update stored receipt image if enhanced by preprocessor
             if (! empty($result['enhanced_image']) && str_starts_with($result['enhanced_image'], 'data:image')) {
@@ -150,11 +155,25 @@ class ProcessUtilityReceiptOcrJob implements ShouldQueue
                     return;
                 }
 
+                // Auto-link ke BosKertasKerjaItem jika profil bertipe anggaran BOS
+                $profileId = $updateData['utility_profile_id'] ?? $this->receipt->utility_profile_id;
+                $fiscalYear = (int) ($updateData['fiscal_year'] ?? $this->receipt->fiscal_year ?? date('Y'));
+                $billingMonth = (string) ($updateData['billing_month'] ?? $this->receipt->billing_month ?? date('m'));
+                $totalAmount = (float) ($updateData['total_amount'] ?? $this->receipt->total_amount ?? 0);
+
+                if ($profileId && empty($this->receipt->bos_kertas_kerja_item_id)) {
+                    $controller = app(UtilityReceiptController::class);
+                    $matchedKkId = $controller->findMatchingKertasKerjaItemId($profileId, $fiscalYear, $billingMonth, $totalAmount);
+                    if ($matchedKkId) {
+                        $updateData['bos_kertas_kerja_item_id'] = $matchedKkId;
+                    }
+                }
+
                 $this->receipt->update($updateData);
 
-                Log::info("Utility Receipt #{$this->receipt->id} successfully processed by background AI OCR.");
+                Log::info("Utility Receipt #{$this->receipt->id} successfully processed by background OCR.");
             } else {
-                $errorMsg = $result['message'] ?? 'AI gagal mengekstrak data dari struk.';
+                $errorMsg = $result['message'] ?? 'OCR gagal mengekstrak teks dari struk.';
                 $attempts = $this->receipt->ocr_attempts;
 
                 $this->receipt->update([

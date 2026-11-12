@@ -2,16 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\BosBarangBelumBelanjaExport;
+use App\Exports\BosDaftarRencanaBelanjaExport;
 use App\Models\BosKertasKerjaItem;
 use App\Models\BosRealisasi;
 use App\Models\BosRencanaBelanja;
 use App\Models\BosRencanaBelanjaItem;
+use App\Models\Guru;
 use App\Models\GuruJabatan;
 use App\Models\Supplier;
+use App\Models\UtilityReceipt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Maatwebsite\Excel\Facades\Excel;
 use Yajra\DataTables\Facades\DataTables;
 
 class BosPanduanBelanjaController extends Controller
@@ -167,7 +172,7 @@ class BosPanduanBelanjaController extends Controller
                 'description' => $g['description'],
                 'unit' => $g['unit'],
                 'price' => $g['price'],
-                'price_display' => 'Rp '.number_format($g['price'], 0, ',', '.'),
+                'price_display' => number_format($g['price'], 0, ',', '.'),
                 'total_budget_vol' => $g['total_budget_vol'],
                 'total_realized_vol' => $g['total_realized_vol'],
                 'total_planned_vol' => $g['total_planned_vol'],
@@ -175,7 +180,7 @@ class BosPanduanBelanjaController extends Controller
                 'available_volume' => $availableVol,
                 'remaining_volume' => $availableVol,
                 'remaining_amount' => $availableAmount,
-                'remaining_amount_display' => 'Rp '.number_format($availableAmount, 0, ',', '.'),
+                'remaining_amount_display' => number_format($availableAmount, 0, ',', '.'),
                 'active_plans' => $g['active_plans'],
                 'is_allocatable' => ! $isFullyPlanned,
                 'paired_pengajuans' => array_values($g['paired_pengajuans']),
@@ -196,6 +201,37 @@ class BosPanduanBelanjaController extends Controller
             })
             ->rawColumns(['checkbox'])
             ->make(true);
+    }
+
+    /**
+     * Export Excel Barang Belum Dibelanjakan
+     */
+    public function exportUnrealizedExcel(Request $request)
+    {
+        $year = $request->input('year', session('fiscal_year', date('Y')));
+        $currentMonthIndex = (int) date('n') - 1;
+        $defaultMonth = $this->months[$currentMonthIndex] ?? 'Desember';
+        $targetMonth = $request->input('month', $defaultMonth);
+        $hidePlanned = $request->has('hide_planned') ? $request->boolean('hide_planned') : true;
+
+        $safeMonth = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $targetMonth);
+        $filename = 'Barang_Belum_Belanja_'.$year.'_'.$safeMonth.'.xlsx';
+
+        return Excel::download(new BosBarangBelumBelanjaExport($year, $targetMonth, $hidePlanned), $filename);
+    }
+
+    /**
+     * Export Excel Daftar Rencana Belanja (Draft)
+     */
+    public function exportGroupsExcel(Request $request)
+    {
+        $year = $request->input('year', (string) session('fiscal_year', date('Y')));
+        $statusFilter = $request->input('status', 'draft');
+
+        $statusSuffix = $statusFilter ? strtoupper(preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $statusFilter)) : 'ALL';
+        $filename = 'Daftar_Rencana_Belanja_'.$year.'_'.$statusSuffix.'.xlsx';
+
+        return Excel::download(new BosDaftarRencanaBelanjaExport($year, $statusFilter), $filename);
     }
 
     public function nextNotaNumber(Request $request)
@@ -409,31 +445,29 @@ class BosPanduanBelanjaController extends Controller
                 return '<button type="button" class="btn btn-xs btn-outline-info btn-toggle-detail px-2 py-0" style="font-size: 0.72rem; border-radius: 4px;" title="Buka / Tutup Rincian"><i class="fas fa-plus"></i></button>';
             })
             ->addColumn('no_nota_display', function ($row) {
-                $nota = $row->no_nota ?: '-';
-
-                return '<span class="badge badge-light border text-info font-tabular font-weight-bold" style="font-size: 0.85rem; padding: 4px 7px;">'.$nota.'</span>';
+                return $row->no_nota ?: '-';
             })
             ->addColumn('planned_date_display', function ($row) {
                 return $row->planned_date ? $row->planned_date->format('d/m/Y') : '-';
             })
             ->addColumn('items_count', function ($row) {
-                return $row->items->count().' Item Barang';
+                return $row->items->count().' barang';
             })
             ->addColumn('total_amount_display', function ($row) {
-                return 'Rp '.number_format($row->total_amount, 0, ',', '.');
+                return number_format($row->total_amount, 0, ',', '.');
             })
             ->addColumn('status_badge', function ($row) {
                 if ($row->status === 'realized') {
-                    return '<span class="badge badge-success font-weight-bold" style="font-size: 0.82rem; padding: 4px 8px; border-radius: 4px;"><i class="fas fa-check-circle mr-1"></i>Sudah Direalisasikan</span>';
+                    return '<span class="badge badge-success font-weight-bold" style="font-size: 0.78rem; padding: 3px 7px; border-radius: 4px;">Realisasi</span>';
                 }
                 if ($row->status === 'ordered') {
-                    return '<span class="badge badge-primary font-weight-bold" style="font-size: 0.82rem; padding: 4px 8px; border-radius: 4px; background-color: #0284c7 !important; border: 1px solid #0369a1;"><i class="fas fa-cart-shopping mr-1"></i>Sudah Diorder</span>';
+                    return '<span class="badge badge-primary font-weight-bold" style="font-size: 0.78rem; padding: 3px 7px; border-radius: 4px; background-color: #0284c7 !important; border: 1px solid #0369a1;">Order</span>';
                 }
                 if ($row->status === 'diajukan_ke_bank') {
-                    return '<span class="badge badge-info font-weight-bold" style="font-size: 0.82rem; padding: 4px 8px; border-radius: 4px;"><i class="fas fa-file-invoice-dollar mr-1"></i>Diajukan ke TNT</span>';
+                    return '<span class="badge badge-info font-weight-bold" style="font-size: 0.78rem; padding: 3px 7px; border-radius: 4px;">TNT</span>';
                 }
 
-                return '<span class="badge badge-warning text-dark font-weight-bold" style="font-size: 0.82rem; padding: 4px 8px; border-radius: 4px;"><i class="fas fa-clock mr-1"></i>Draft Rencana</span>';
+                return '<span class="badge badge-warning text-dark font-weight-bold" style="font-size: 0.78rem; padding: 3px 7px; border-radius: 4px;">Draft</span>';
             })
             ->addColumn('tnt_letter_number', function ($row) {
                 return $row->pencairanBankItem?->pencairanBank?->letter_number;
@@ -454,33 +488,33 @@ class BosPanduanBelanjaController extends Controller
                         'volume_plan' => (float) $it->volume_plan,
                         'unit' => $it->unit,
                         'price' => (float) $it->price,
-                        'price_display' => 'Rp '.number_format($it->price, 0, ',', '.'),
+                        'price_display' => number_format($it->price, 0, ',', '.'),
                         'total_amount' => (float) $it->total_amount,
-                        'total_amount_display' => 'Rp '.number_format($it->total_amount, 0, ',', '.'),
+                        'total_amount_display' => number_format($it->total_amount, 0, ',', '.'),
                     ];
                 });
             })
             ->addColumn('action', function ($row) {
                 $btn = '<button type="button" class="btn btn-outline-info btn-xs btn-show-detail mr-1" data-id="'.$row->id.'" title="Lihat Detail Modal"><i class="fas fa-eye"></i></button>';
-                $btn .= '<a href="'.route('bos.panduan.print', $row->id).'" target="_blank" class="btn btn-info btn-xs mr-1" title="Cetak Panduan Belanja / Checklist"><i class="fas fa-print"></i> Cetak</a>';
+                $btn .= '<a href="'.route('bos.panduan.print', $row->id).'" target="_blank" class="btn btn-info btn-xs mr-1" title="Cetak Panduan Belanja / Checklist"><i class="fas fa-print"></i></a>';
 
                 if ($row->status === 'draft') {
-                    $btn .= '<button type="button" class="btn btn-outline-primary btn-xs btn-toggle-order mr-1" data-id="'.$row->id.'" data-status="ordered" title="Tandai pesanan ini SUDAH DIORDER"><i class="fas fa-cart-arrow-down mr-1"></i> Diorderkan</button>';
+                    $btn .= '<button type="button" class="btn btn-outline-primary btn-xs btn-toggle-order mr-1" data-id="'.$row->id.'" data-status="ordered" title="Tandai pesanan ini SUDAH DIORDER"><i class="fas fa-cart-arrow-down"></i></button>';
                 } elseif ($row->status === 'ordered') {
-                    $btn .= '<button type="button" class="btn btn-primary btn-xs btn-toggle-order mr-1" data-id="'.$row->id.'" data-status="draft" title="Klik untuk membatalkan status Diorder (kembali ke Draft)"><i class="fas fa-check mr-1"></i> Diorder <i class="fas fa-undo ml-1" style="font-size: 0.65rem;"></i></button>';
+                    $btn .= '<button type="button" class="btn btn-primary btn-xs btn-toggle-order mr-1" data-id="'.$row->id.'" data-status="draft" title="Klik untuk membatalkan status Diorder (kembali ke Draft)"><i class="fas fa-check"></i></button>';
                 }
 
-                $btn .= '<button class="btn btn-warning btn-xs btn-edit-group mr-1" data-id="'.$row->id.'" title="Edit Rencana Belanja"><i class="fas fa-edit"></i> Edit</button>';
+                $btn .= '<button class="btn btn-warning btn-xs btn-edit-group mr-1" data-id="'.$row->id.'" title="Edit Rencana Belanja"><i class="fas fa-edit"></i></button>';
 
                 if (in_array($row->status, ['draft', 'ordered'])) {
-                    $btn .= '<button class="btn btn-success btn-xs btn-convert mr-1" data-id="'.$row->id.'" title="Proses Jadi Realisasi BKU"><i class="fas fa-receipt"></i> Eksekusi Realisasi</button>';
+                    $btn .= '<button class="btn btn-success btn-xs btn-convert mr-1" data-id="'.$row->id.'" title="Proses Jadi Realisasi BKU"><i class="fas fa-receipt"></i></button>';
                 }
 
                 $btn .= '<button class="btn btn-danger btn-xs btn-delete-group" data-url="'.route('bos.panduan.destroy-group', $row->id).'" title="Hapus Rencana"><i class="fas fa-trash"></i></button>';
 
                 return $btn;
             })
-            ->rawColumns(['btn_expand', 'no_nota_display', 'status_badge', 'action'])
+            ->rawColumns(['btn_expand', 'status_badge', 'action'])
             ->make(true);
     }
 
@@ -626,6 +660,9 @@ class BosPanduanBelanjaController extends Controller
 
             // If already realized, sync no_nota to existing realisasis
             BosRealisasi::where('bos_rencana_belanja_id', $group->id)->update(['no_nota' => $noNota]);
+
+            $submittedItemIds = collect($request->items)->pluck('id')->filter()->toArray();
+            $group->items()->whereNotIn('id', $submittedItemIds)->delete();
 
             foreach ($request->items as $itemData) {
                 $item = BosRencanaBelanjaItem::findOrFail($itemData['id']);
@@ -778,6 +815,275 @@ class BosPanduanBelanjaController extends Controller
     }
 
     /**
+     * Get data for Modal Bayar Utilitas (receipts, KK utility items, gurus)
+     */
+    public function getUtilityPaymentModalData(Request $request)
+    {
+        $year = (int) $request->input('year', session('fiscal_year', date('Y')));
+        $currentMonthIndex = (int) date('n') - 1;
+        $defaultMonth = $this->months[$currentMonthIndex] ?? 'Desember';
+        $month = $request->input('month', $defaultMonth);
+
+        // 1. Ambil struk utilitas yang belum masuk rencana belanja dan belum dibayar (khusus BOS / bukan SMP PGRI)
+        $receipts = UtilityReceipt::with(['profile.defaultReimburseGuru.primaryBankAccount', 'kertasKerjaItem'])
+            ->whereNull('bos_rencana_belanja_id')
+            ->where('is_paid', false)
+            ->where(function ($q) {
+                $q->whereHas('profile', function ($pq) {
+                    $pq->where('is_budgeted', true)
+                        ->where(function ($codeQ) {
+                            $codeQ->whereNull('code')->orWhere('code', '!=', 'listrik_smp');
+                        })
+                        ->where('name', 'not like', '%smp%');
+                })->where(function ($cq) {
+                    $cq->whereNull('customer_name')
+                        ->orWhere('customer_name', 'not like', '%smp%');
+                });
+            })
+            ->where(function ($q) use ($year) {
+                $q->where('fiscal_year', $year)
+                    ->orWhere(function ($sub) use ($year) {
+                        $sub->whereNull('fiscal_year')
+                            ->where(function ($dateQ) use ($year) {
+                                $dateQ->whereYear('transaction_date', $year)
+                                    ->orWhereYear('created_at', $year);
+                            });
+                    });
+            })
+            ->when($month && $month !== 'all', function ($q) use ($month) {
+                $q->where(function ($sub) use ($month) {
+                    $sub->where('billing_month', $month)
+                        ->orWhere(function ($emptyQ) use ($month) {
+                            $targetMonthNum = array_search($month, $this->months);
+                            if ($targetMonthNum !== false) {
+                                $emptyQ->where(function ($eq) {
+                                    $eq->whereNull('billing_month')->orWhere('billing_month', '');
+                                })->whereMonth('transaction_date', $targetMonthNum + 1);
+                            }
+                        });
+                });
+            })
+            ->orderBy('transaction_date', 'asc')
+            ->get();
+
+        // 2. Ambil Kertas Kerja Langganan Daya & Jasa serta BBM tahun terpilih
+        $targetKegiatans = [
+            'pembayaran daya listrik',
+            'pembayaran biaya telepon',
+            'pembayaran jasa internet',
+            'pembelian bahan bakar minyak/gas untuk keperluan pembelajaran/rt sekolah',
+        ];
+
+        $kkUtilityItems = BosKertasKerjaItem::where('year', $year)
+            ->whereHas('file', fn ($f) => $f->where('is_active', true))
+            ->where(function ($q) use ($targetKegiatans) {
+                $q->whereIn(DB::raw('LOWER(TRIM(kegiatan))'), $targetKegiatans)
+                    ->orWhereNotNull('utility_profile_id');
+            })
+            ->orderByRaw("CASE month WHEN 'Januari' THEN 1 WHEN 'Februari' THEN 2 WHEN 'Maret' THEN 3 WHEN 'April' THEN 4 WHEN 'Mei' THEN 5 WHEN 'Juni' THEN 6 WHEN 'Juli' THEN 7 WHEN 'Agustus' THEN 8 WHEN 'September' THEN 9 WHEN 'Oktober' THEN 10 WHEN 'November' THEN 11 WHEN 'Desember' THEN 12 ELSE 99 END ASC")
+            ->get();
+
+        $kkFormatted = $kkUtilityItems->map(function ($item) {
+            $totalBudget = (float) $item->volume * (float) $item->price;
+            if ($totalBudget <= 0 && (float) $item->total_amount > 0) {
+                $totalBudget = (float) $item->total_amount;
+            }
+
+            $totalRealized = (float) BosRealisasi::where('bos_kertas_kerja_item_id', $item->id)->sum('total_amount');
+            $activePlanned = (float) BosRencanaBelanjaItem::where('bos_kertas_kerja_item_id', $item->id)
+                ->whereHas('rencanaBelanja', function ($q) {
+                    $q->whereNull('deleted_at')
+                        ->where(function ($sq) {
+                            $sq->whereNull('status')->orWhere('status', '!=', 'realized');
+                        });
+                })
+                ->sum('total_amount');
+
+            $remainingAmount = max(0, $totalBudget - ($totalRealized + $activePlanned));
+
+            return [
+                'id' => $item->id,
+                'utility_profile_id' => $item->utility_profile_id,
+                'account_code' => $item->account_code,
+                'program_code' => $item->program_code,
+                'kegiatan' => $item->kegiatan,
+                'description' => $item->description,
+                'month' => $item->month,
+                'price' => (float) $item->price,
+                'volume' => (float) $item->volume,
+                'unit' => $item->unit,
+                'total_budget' => $totalBudget,
+                'remaining_amount' => $remainingAmount,
+                'label' => "[{$item->month}] {$item->description} (Sisa: Rp ".number_format($remainingAmount, 0, ',', '.').')',
+            ];
+        });
+
+        // 3. Daftar Guru untuk Reimburse
+        $gurus = Guru::where('is_active', true)
+            ->with('primaryBankAccount', 'bankAccounts')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($g) {
+                $acc = $g->primaryBankAccount ?? $g->bankAccounts->first();
+
+                return [
+                    'id' => $g->id,
+                    'name' => $g->name,
+                    'bank_name' => $acc?->bank_name ?: 'Bank Jatim',
+                    'account_number' => $acc?->account_number ?: '',
+                    'account_holder' => $acc?->account_holder ?: $g->name,
+                ];
+            });
+
+        // Cari default guru reimburse dari profil struk yang ada
+        $defaultGuruId = null;
+        $defaultBankName = 'Bank Jatim';
+        $defaultAccountNumber = '';
+        foreach ($receipts as $r) {
+            if ($r->profile && $r->profile->default_reimburse_guru_id) {
+                $defaultGuruId = $r->profile->default_reimburse_guru_id;
+                $dg = $gurus->firstWhere('id', $defaultGuruId);
+                if ($dg) {
+                    $defaultBankName = $dg['bank_name'];
+                    $defaultAccountNumber = $dg['account_number'];
+                }
+                break;
+            }
+        }
+
+        // Format Struk
+        $formattedReceipts = $receipts->map(function ($r) use ($kkFormatted) {
+            $bestKkId = $r->bos_kertas_kerja_item_id;
+            if (! $bestKkId && $r->utility_profile_id) {
+                $matched = $kkFormatted->firstWhere('utility_profile_id', $r->utility_profile_id);
+                $bestKkId = $matched['id'] ?? null;
+            }
+
+            return [
+                'id' => $r->id,
+                'utility_profile_id' => $r->utility_profile_id,
+                'profile_name' => $r->profile?->name ?: ($r->customer_name ?: 'Tagihan Utilitas'),
+                'category' => $r->profile?->category ?: 'listrik',
+                'customer_name' => $r->customer_name ?: '-',
+                'customer_number' => $r->customer_number ?: ($r->meter_number ?: '-'),
+                'billing_month' => $r->billing_month ?: ($r->transaction_date ? $r->transaction_date->format('F') : '-'),
+                'total_amount' => (float) $r->total_amount,
+                'total_amount_display' => 'Rp '.number_format($r->total_amount, 0, ',', '.'),
+                'token_number' => $r->token_number ?: null,
+                'receipt_number' => $r->receipt_number ?: null,
+                'transaction_date' => $r->transaction_date ? $r->transaction_date->format('d/m/Y') : '-',
+                'receipt_url' => $r->receipt_url,
+                'suggested_kk_id' => $bestKkId,
+            ];
+        });
+
+        $noNota = BosRencanaBelanja::generateNoNota($year, $month);
+        $defaultTitle = "Bayar Utilitas dan BBM {$month}";
+
+        return response()->json([
+            'year' => $year,
+            'month' => $month,
+            'no_nota' => $noNota,
+            'title' => $defaultTitle,
+            'receipts' => $formattedReceipts,
+            'kertas_kerja_items' => $kkFormatted,
+            'gurus' => $gurus,
+            'default_guru_id' => $defaultGuruId,
+            'default_bank_name' => $defaultBankName,
+            'default_account_number' => $defaultAccountNumber,
+        ]);
+    }
+
+    /**
+     * Store Bundled Utility Payment into a single BosRencanaBelanja
+     */
+    public function storeUtilityPaymentGroup(Request $request)
+    {
+        $request->validate([
+            'year' => 'required|integer',
+            'month' => 'required|string',
+            'no_nota' => 'nullable|string|max:50',
+            'title' => 'nullable|string|max:255',
+            'guru_id' => 'required|exists:gurus,id',
+            'bank_name' => 'nullable|string|max:100',
+            'account_number' => 'nullable|string|max:50',
+            'planned_date' => 'nullable|date',
+            'notes' => 'nullable|string',
+            'receipts' => 'required|array|min:1',
+            'receipts.*.id' => 'required|exists:utility_receipts,id',
+            'receipts.*.bos_kertas_kerja_item_id' => 'required|exists:bos_kertas_kerja_items,id',
+            'receipts.*.nominal' => 'required|numeric|min:1',
+        ]);
+
+        $guru = Guru::with('primaryBankAccount', 'bankAccounts')->findOrFail($request->guru_id);
+        $acc = $guru->primaryBankAccount ?? $guru->bankAccounts->first();
+        $bankName = $request->bank_name ?: ($acc?->bank_name ?? 'Bank Jatim');
+        $accountNumber = $request->account_number ?: ($acc?->account_number ?? '');
+
+        $noNota = $request->no_nota ?: BosRencanaBelanja::generateNoNota($request->year, $request->month);
+        $title = $request->title ?: ("Bayar Utilitas dan BBM {$request->month}");
+
+        DB::beginTransaction();
+        try {
+            $group = BosRencanaBelanja::create([
+                'supplier_id' => null,
+                'guru_id' => $guru->id,
+                'no_nota' => $noNota,
+                'year' => $request->year,
+                'month' => $request->month,
+                'title' => $title,
+                'type' => 'utilitas',
+                'supplier_name' => $guru->name,
+                'bank_name' => $bankName,
+                'account_number' => $accountNumber,
+                'planned_date' => $request->planned_date ?: date('Y-m-d'),
+                'notes' => $request->notes,
+                'status' => 'draft',
+                'created_by' => Auth::id(),
+            ]);
+
+            foreach ($request->receipts as $rData) {
+                $receipt = UtilityReceipt::with('profile')->findOrFail($rData['id']);
+                $kkItem = BosKertasKerjaItem::findOrFail($rData['bos_kertas_kerja_item_id']);
+                $nominal = (float) $rData['nominal'];
+
+                // Update receipt linkage
+                $receipt->update([
+                    'bos_rencana_belanja_id' => $group->id,
+                    'bos_kertas_kerja_item_id' => $kkItem->id,
+                ]);
+
+                $profileName = $receipt->profile?->name ?: ($receipt->customer_name ?: 'Tagihan Utilitas');
+                $custNum = $receipt->customer_number ? " ({$receipt->customer_number})" : '';
+
+                BosRencanaBelanjaItem::create([
+                    'bos_rencana_belanja_id' => $group->id,
+                    'bos_kertas_kerja_item_id' => $kkItem->id,
+                    'volume_plan' => 1,
+                    'unit' => $kkItem->unit ?: 'Bulan',
+                    'price' => $nominal,
+                    'total_amount' => $nominal,
+                    'spesifikasi' => "Reimburse {$profileName}{$custNum} - {$receipt->billing_month}",
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Paket Rencana Belanja Utilitas {$noNota} berhasil dibuat.",
+                'group_id' => $group->id,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'message' => 'Gagal membuat rencana utilitas: '.$e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
      * Delete Group (Draft or Realized)
      */
     public function destroyGroup($id)
@@ -790,6 +1096,11 @@ class BosPanduanBelanjaController extends Controller
 
         if ($group->status === 'diajukan_ke_bank' || $group->pencairan_bank_item_id) {
             return response()->json(['message' => 'Rencana belanja ini sedang diajukan dalam Surat Pencairan Bank (TNT). Hapus terlebih dahulu dari Surat TNT sebelum menghapus rencana belanja.'], 422);
+        }
+
+        // Release associated utility receipts if any
+        if ($group->utilityReceipts()->exists()) {
+            $group->utilityReceipts()->update(['bos_rencana_belanja_id' => null]);
         }
 
         // Clean up soft-deleted realisasi records if any

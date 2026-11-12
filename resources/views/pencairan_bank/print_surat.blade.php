@@ -473,7 +473,7 @@
     {{-- Judul Surat Kuasa --}}
     <div class="kuasa-title">
         <h2>SURAT KUASA</h2>
-        <div>No. {{ $pencairanBank->letter_number }}</div>
+        <div>No. {{ $pencairanBank->kuasa_letter_number }}</div>
     </div>
 
     <div style="font-size: 10.5pt; margin-bottom: 6px;">Yang bertanda tangan dibawah ini :</div>
@@ -580,7 +580,7 @@
         <h2>DAFTAR SURAT PERINTAH PENCAIRAN DANA</h2>
         <h3>SMKS PGRI KRAS</h3>
         <div>YANG TIDAK TERPISAHKAN DARI SURAT KUASA</div>
-        <div>{{ $pencairanBank->letter_number }}</div>
+        <div>{{ $pencairanBank->kuasa_letter_number }}</div>
     </div>
 
     <table class="data-table">

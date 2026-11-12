@@ -17,6 +17,7 @@ use App\Models\UtilityReceipt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
 use Yajra\DataTables\Facades\DataTables;
 
@@ -110,11 +111,15 @@ class PencairanBankController extends Controller
                         if ($item->type === 'perjadin') {
                             $typeBadge = '<span class="badge badge-info px-2 py-0" style="font-size:0.7rem;"><i class="fas fa-car mr-1"></i>Perjadin</span>';
                         } elseif ($item->type === 'rencana_nota' || $item->rencanaBelanja) {
-                            if (str_starts_with(strtoupper((string) $item->account_number), 'VA.')) {
+                            if ($item->type === 'utilitas' || ($item->rencanaBelanja && $item->rencanaBelanja->type === 'utilitas')) {
+                                $typeBadge = '<span class="badge badge-warning text-dark px-2 py-0 font-tabular" style="font-size:0.7rem;"><i class="fas fa-bolt mr-1"></i>Utilitas</span>';
+                            } elseif (str_starts_with(strtoupper((string) $item->account_number), 'VA.')) {
                                 $typeBadge = '<span class="badge badge-warning text-dark px-2 py-0" style="font-size:0.7rem;"><i class="fas fa-store mr-1"></i>Online</span>';
                             } else {
                                 $typeBadge = '<span class="badge badge-primary px-2 py-0 font-tabular" style="font-size:0.7rem;"><i class="fas fa-cart-shopping mr-1"></i>Rencana Belanja</span>';
                             }
+                        } elseif ($item->type === 'utilitas') {
+                            $typeBadge = '<span class="badge badge-warning text-dark px-2 py-0 font-tabular" style="font-size:0.7rem;"><i class="fas fa-bolt mr-1"></i>Utilitas</span>';
                         } else {
                             $typeBadge = '<span class="badge badge-secondary px-2 py-0" style="font-size:0.7rem;">Belanja</span>';
                         }
@@ -205,31 +210,14 @@ class PencairanBankController extends Controller
             return (float) $r->total_amount;
         });
 
-        // Ambil data Tagihan Utilitas yang belum dicairkan via TNT
+        // Pembayaran utilitas kini diproses satu pintu melalui Rencana Belanja (tipe 'utilitas'),
+        // sehingga struk utilitas tidak lagi dihitung sebagai tagihan TNT langsung.
         $unpaidUtilityReceipts = collect([]);
-        if ($fundingSource === 'BOSP') {
-            $unpaidUtilityReceipts = UtilityReceipt::with(['profile', 'kertasKerjaItem'])
-                ->whereNull('pencairan_bank_item_id')
-                ->where('is_paid', false)
-                ->where(function ($q) use ($activeFiscalYear) {
-                    $q->where('fiscal_year', $activeFiscalYear)
-                        ->orWhere(function ($sub) use ($activeFiscalYear) {
-                            $sub->whereNull('fiscal_year')
-                                ->where(function ($dateQ) use ($activeFiscalYear) {
-                                    $dateQ->whereYear('transaction_date', $activeFiscalYear)
-                                        ->orWhereYear('created_at', $activeFiscalYear);
-                                });
-                        });
-                })
-                ->orderBy('transaction_date', 'desc')
-                ->get();
-        }
+        $unpaidUtilityCount = 0;
+        $unpaidUtilityTotalAmount = 0.0;
 
-        $unpaidUtilityCount = $unpaidUtilityReceipts->count();
-        $unpaidUtilityTotalAmount = (float) $unpaidUtilityReceipts->sum('total_amount');
-
-        $totalPendingCount = $unpaidItemsCount + $unpaidRencanaCount + $unpaidUtilityCount;
-        $totalPendingAmount = $unpaidTotalAmount + $unpaidRencanaTotalAmount + $unpaidUtilityTotalAmount;
+        $totalPendingCount = $unpaidItemsCount + $unpaidRencanaCount;
+        $totalPendingAmount = $unpaidTotalAmount + $unpaidRencanaTotalAmount;
 
         return view('pencairan_bank.index', compact(
             'fundingSource',
@@ -274,6 +262,7 @@ class PencairanBankController extends Controller
         $sourceAccountName = $school ? ($school->{$prefix.'_account_name'} ?? "20511923 SMKS PGRI KRAS KEDIRI ({$fundingSource})") : "20511923 SMKS PGRI KRAS KEDIRI ({$fundingSource})";
 
         $gurus = Guru::where('is_active', true)->orderBy('name')->get();
+        $activeFiscalYear = (string) session('fiscal_year', date('Y'));
 
         return view('pencairan_bank.create', compact(
             'fundingSource',
@@ -286,7 +275,8 @@ class PencairanBankController extends Controller
             'bankBranch',
             'bankAddress',
             'sourceAccountNum',
-            'sourceAccountName'
+            'sourceAccountName',
+            'activeFiscalYear'
         ));
     }
 
@@ -516,11 +506,13 @@ class PencairanBankController extends Controller
                 if (! empty($itemData['perjadin_item_id'])) {
                     $perjadinItem = PerjadinItem::find($itemData['perjadin_item_id']);
                     if ($perjadinItem) {
+                        $isAlreadyDicairkan = $pencairanBank->status === 'dicairkan';
                         $perjadinItem->update([
                             'pencairan_bank_item_id' => $bankItem->id,
+                            'is_paid' => $isAlreadyDicairkan ? true : $perjadinItem->is_paid,
                         ]);
                         $perjadinItem->perjadin()->update([
-                            'status' => 'diajukan_ke_bank',
+                            'status' => $isAlreadyDicairkan ? 'lunas' : 'diajukan_ke_bank',
                         ]);
                     }
                 }
@@ -528,11 +520,12 @@ class PencairanBankController extends Controller
                 if (! empty($itemData['bos_rencana_belanja_id'])) {
                     $rencanaBelanja = BosRencanaBelanja::find($itemData['bos_rencana_belanja_id']);
                     if ($rencanaBelanja) {
+                        $isAlreadyDicairkan = $pencairanBank->status === 'dicairkan';
                         $rencanaBelanja->update([
                             'pencairan_bank_item_id' => $bankItem->id,
                             'bank_name' => $itemData['bank_name'] ?? $rencanaBelanja->bank_name,
                             'account_number' => $itemData['account_number'] ?? $rencanaBelanja->account_number,
-                            'status' => 'diajukan_ke_bank',
+                            'status' => $isAlreadyDicairkan ? 'realized' : 'diajukan_ke_bank',
                         ]);
                     }
                 }
@@ -633,6 +626,15 @@ class PencairanBankController extends Controller
                             'no_nota' => $noNota,
                             'status' => 'realized',
                         ]);
+
+                        // Jika rencana belanja membundel struk utilitas, tandai lunas juga struknya
+                        if ($rencana->utilityReceipts()->exists()) {
+                            $rencana->utilityReceipts()->update([
+                                'is_paid' => true,
+                                'payment_date' => $validated['cair_date'],
+                                'bku_number' => $validated['bku_number'] ?? null,
+                            ]);
+                        }
                     }
                 }
 
@@ -877,7 +879,12 @@ class PencairanBankController extends Controller
         $activeFiscalYear = (string) session('fiscal_year', date('Y'));
         $targetYear = $request->get('year', $activeFiscalYear);
 
-        $notasQuery = BosRencanaBelanja::with(['items.kertasKerjaItem', 'supplier.bankAccounts'])
+        $withRelations = ['items.kertasKerjaItem', 'supplier.bankAccounts', 'guru.primaryBankAccount'];
+        if (Schema::hasTable('utility_receipts')) {
+            $withRelations[] = 'utilityReceipts';
+        }
+
+        $notasQuery = BosRencanaBelanja::with($withRelations)
             ->whereNull('pencairan_bank_item_id')
             ->where(function ($q) {
                 $q->whereNull('status')->orWhere('status', '!=', 'realized');
@@ -905,7 +912,12 @@ class PencairanBankController extends Controller
                 $isOnline = false;
                 $marketplaceName = '';
 
-                if ($nota->supplier) {
+                if ($nota->type === 'utilitas' || $nota->guru_id) {
+                    $supplier = $nota->guru ? $nota->guru->name : ($nota->supplier_name ?: 'Petugas Utilitas');
+                    $recipientName = $supplier;
+                    $isOnline = false;
+                    $marketplaceName = 'Utilitas';
+                } elseif ($nota->supplier) {
                     if ($nota->supplier->type === 'online') {
                         $isOnline = true;
                         $marketplaceName = $nota->supplier->marketplace_name ?: 'Siplah Toko Ladang';
@@ -983,14 +995,15 @@ class PencairanBankController extends Controller
                     'recipient_name' => $recipientName,
                     'is_online' => $isOnline,
                     'marketplace_name' => $marketplaceName,
-                    'bank_name' => $nota->bank_name ?: ($nota->supplier ? $nota->supplier->bank_name : 'Bank Jatim'),
-                    'account_number' => $nota->account_number ?: ($nota->supplier ? $nota->supplier->account_number : ''),
+                    'bank_name' => $nota->bank_name ?: ($nota->guru?->primaryBankAccount?->bank_name ?? ($nota->supplier ? $nota->supplier->bank_name : 'Bank Jatim')),
+                    'account_number' => $nota->account_number ?: ($nota->guru?->primaryBankAccount?->account_number ?? ($nota->supplier ? $nota->supplier->account_number : '')),
                     'planned_date' => $nota->planned_date ? $nota->planned_date->format('d/m/Y') : '-',
                     'items_count' => $itemsCount,
                     'items_summary' => implode(', ', $itemsSummaryList),
                     'has_conflict' => $hasConflict,
                     'conflict_messages' => $conflictMessages,
                     'total_amount' => $totalAmount,
+                    'type' => $nota->type ?: 'belanja',
                     'description' => $nota->title,
                 ];
             });
@@ -1014,7 +1027,20 @@ class PencairanBankController extends Controller
             'kertasKerjaItem',
         ])
             ->whereNull('pencairan_bank_item_id')
-            ->where('is_paid', false);
+            ->whereNull('bos_rencana_belanja_id')
+            ->where('is_paid', false)
+            ->where(function ($q) {
+                $q->whereHas('profile', function ($pq) {
+                    $pq->where('is_budgeted', true)
+                        ->where(function ($codeQ) {
+                            $codeQ->whereNull('code')->orWhere('code', '!=', 'listrik_smp');
+                        })
+                        ->where('name', 'not like', '%smp%');
+                })->where(function ($cq) {
+                    $cq->whereNull('customer_name')
+                        ->orWhere('customer_name', 'not like', '%smp%');
+                });
+            });
 
         if ($targetYear && $targetYear !== 'all') {
             $receiptsQuery->where(function ($q) use ($targetYear) {

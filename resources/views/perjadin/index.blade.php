@@ -105,17 +105,37 @@
                 <i class="fas fa-calendar-alt me-1 mr-1"></i> Tahun Anggaran {{ $selectedYear }}
             </span>
 
-            {{-- Filter Status BKU --}}
-            <div class="btn-group btn-group-sm shadow-xs" role="group" id="bkuFilterGroup">
-                <button type="button" class="btn btn-sm btn-outline-primary active btn-bku-filter font-weight-bold d-inline-flex align-items-center" data-status="" style="height: 31px; font-size: 0.8125rem; padding: 0.25rem 0.65rem;">
+            {{-- Filter Status Kegiatan --}}
+            <div class="btn-group btn-group-sm shadow-xs" role="group" id="statusFilterGroup">
+                <button type="button" class="btn btn-sm btn-outline-primary active btn-status-filter font-weight-bold d-inline-flex align-items-center" data-status="" style="height: 31px; font-size: 0.8125rem; padding: 0.25rem 0.65rem;">
                     Semua <span class="badge badge-light border ml-1 ms-1" id="countTotal">{{ $totalCount ?? 0 }}</span>
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-warning text-dark btn-bku-filter font-weight-bold d-inline-flex align-items-center" data-status="unassigned" style="height: 31px; font-size: 0.8125rem; padding: 0.25rem 0.65rem;">
-                    <i class="fas fa-clock mr-1 me-1 text-warning"></i>Belum BKU <span class="badge badge-warning text-dark ml-1 ms-1" id="countUnassigned">{{ $unassignedBkuCount ?? 0 }}</span>
+                <button type="button" class="btn btn-sm btn-outline-warning text-dark btn-status-filter font-weight-bold d-inline-flex align-items-center" data-status="draft" style="height: 31px; font-size: 0.8125rem; padding: 0.25rem 0.65rem;">
+                    <i class="fas fa-hourglass-half mr-1 me-1 text-warning"></i>Draft <span class="badge badge-warning text-dark ml-1 ms-1" id="countDraft">{{ $draftCount ?? 0 }}</span>
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-success btn-bku-filter font-weight-bold d-inline-flex align-items-center" data-status="assigned" style="height: 31px; font-size: 0.8125rem; padding: 0.25rem 0.65rem;">
-                    <i class="fas fa-check-circle mr-1 me-1 text-success"></i>Sudah BKU <span class="badge badge-success ml-1 ms-1" id="countAssigned">{{ $assignedBkuCount ?? 0 }}</span>
+                <button type="button" class="btn btn-sm btn-outline-info text-dark btn-status-filter font-weight-bold d-inline-flex align-items-center" data-status="tnt" style="height: 31px; font-size: 0.8125rem; padding: 0.25rem 0.65rem;">
+                    <i class="fas fa-file-invoice-dollar mr-1 me-1 text-info"></i>TNT <span class="badge badge-info ml-1 ms-1 text-white" id="countTnt">{{ $tntCount ?? 0 }}</span>
                 </button>
+                <button type="button" class="btn btn-sm btn-outline-success btn-status-filter font-weight-bold d-inline-flex align-items-center" data-status="cair" style="height: 31px; font-size: 0.8125rem; padding: 0.25rem 0.65rem;">
+                    <i class="fas fa-check-circle mr-1 me-1 text-success"></i>Cair <span class="badge badge-success ml-1 ms-1" id="countCair">{{ $cairCount ?? 0 }}</span>
+                </button>
+            </div>
+
+            {{-- Filter Tanggal Pencairan (TNT) --}}
+            <div class="input-group input-group-sm shadow-xs" style="height: 31px; width: auto;">
+                <span class="input-group-text bg-light text-dark font-weight-bold border-end-0 py-0 px-2" style="font-size: 0.78rem;" title="Pilih tanggal pencairan bank (TNT)">
+                    <i class="fas fa-hand-holding-usd text-success mr-1 me-1"></i> Cair:
+                </span>
+                <select id="filterPaymentDate" class="form-select form-control form-control-sm font-weight-500 py-0" style="height: 31px; font-size: 0.8125rem; min-width: 170px; max-width: 250px;">
+                    <option value="">Semua Tanggal Cair</option>
+                    @if(isset($availablePaymentDates) && count($availablePaymentDates) > 0)
+                        @foreach($availablePaymentDates as $pd)
+                            <option value="{{ $pd['date'] }}">Cair: {{ $pd['formatted'] }} ({{ $pd['count'] }} kegiatan)</option>
+                        @endforeach
+                    @endif
+                    <option value="custom">Pilih Tanggal Manual...</option>
+                </select>
+                <input type="date" id="customPaymentDate" class="form-control form-control-sm font-tabular py-0 d-none" style="height: 31px; font-size: 0.8125rem; width: 135px;" title="Pilih tanggal pencairan manual">
             </div>
         </div>
     </div>
@@ -137,6 +157,9 @@
                 <button type="button" class="btn btn-xs btn-outline-secondary" id="btnDeselectAll">
                     Batal Pilih
                 </button>
+                <button type="button" class="btn btn-sm btn-success font-weight-bold shadow-sm" id="btnPrintBatchKwitansi">
+                    <i class="fas fa-print mr-1 me-1"></i> Cetak Kwitansi Massal (<span id="batchPrintCount">0</span>)
+                </button>
                 <button type="button" class="btn btn-sm btn-primary font-weight-bold shadow-sm" id="btnOpenBatchBku">
                     <i class="fas fa-pen-to-square mr-1 me-1"></i> Isi Nomor BKU Massal
                 </button>
@@ -152,11 +175,10 @@
                         </th>
                         <th width="3%" class="text-center">No</th>
                         <th width="28%">Tujuan & Maksud Dinas</th>
-                        <th width="12%">Tanggal Pelaksanaan</th>
-                        <th width="13%" class="text-center">Nomor BKU</th>
-                        <th width="17%">Peserta Dinas</th>
-                        <th width="12%" class="text-right">Total Bersih</th>
-                        <th width="6%" class="text-center">Status</th>
+                        <th width="14%" class="text-nowrap">Tanggal Pelaksanaan</th>
+                        <th width="15%" class="text-center">NO BKU/SPPD</th>
+                        <th width="18%">Peserta Dinas</th>
+                        <th width="13%" class="text-right">Total Bersih</th>
                         <th width="6%" class="text-center">Aksi</th>
                     </tr>
                 </thead>
@@ -292,7 +314,7 @@
 @section('js')
 <script>
 $(document).ready(function() {
-    let currentBkuStatus = '';
+    let currentStatus = '';
     let selectedIds = new Set();
     let currentQuickTeacherCount = 1;
     let currentQuickYear = new Date().getFullYear();
@@ -301,22 +323,27 @@ $(document).ready(function() {
         processing: true,
         serverSide: true,
         pageLength: 25,
+        order: [[3, 'desc']],
         ajax: {
             url: "{{ route($routePrefix . '.perjadin.index', [], false) }}",
             data: function(d) {
                 d.year = $('#filterYear').val();
-                d.bku_status = currentBkuStatus;
+                d.status = currentStatus;
+                let pDate = $('#filterPaymentDate').val();
+                if (pDate === 'custom') {
+                    pDate = $('#customPaymentDate').val();
+                }
+                d.payment_date = pDate;
             }
         },
         columns: [
             {data: 'checkbox', name: 'checkbox', orderable: false, searchable: false, className: 'text-center'},
             {data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center font-tabular'},
             {data: 'tujuan_display', name: 'destination_name'},
-            {data: 'tanggal_display', name: 'departure_date'},
+            {data: 'tanggal_display', name: 'departure_date', className: 'text-nowrap'},
             {data: 'bku_display', name: 'bku_number', className: 'text-center'},
-            {data: 'peserta_display', name: 'peserta', orderable: false, searchable: false},
+            {data: 'peserta_display', name: 'peserta', orderable: true, searchable: false},
             {data: 'nominal_display', name: 'total_net_amount', className: 'text-right'},
-            {data: 'status_display', name: 'status', className: 'text-center'},
             {data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-center'}
         ],
         drawCallback: function() {
@@ -334,22 +361,64 @@ $(document).ready(function() {
     table.on('xhr', function(e, settings, json) {
         if (json && json.counters) {
             $('#countTotal').text(json.counters.total ?? 0);
-            $('#countUnassigned').text(json.counters.unassigned ?? 0);
-            $('#countAssigned').text(json.counters.assigned ?? 0);
+            $('#countDraft').text(json.counters.draft ?? 0);
+            $('#countTnt').text(json.counters.tnt ?? 0);
+            $('#countCair').text(json.counters.cair ?? 0);
         }
     });
 
     // ── Filter Tahun Anggaran ─────────────────────────
     $('#filterYear').change(function() {
         table.ajax.reload();
-        refreshCounters();
     });
 
-    // ── Filter Status BKU ─────────────────────────────
-    $('.btn-bku-filter').click(function() {
-        $('.btn-bku-filter').removeClass('active');
+    // ── Filter Status Kegiatan (Semua, Draft, TNT, Cair) ──
+    $('.btn-status-filter').click(function() {
+        $('.btn-status-filter').removeClass('active');
         $(this).addClass('active');
-        currentBkuStatus = $(this).data('status');
+        currentStatus = $(this).data('status');
+
+        if (currentStatus === 'draft' || currentStatus === 'tnt' || currentStatus === '') {
+            $('#filterPaymentDate').val('');
+            $('#customPaymentDate').addClass('d-none').val('');
+        }
+
+        selectedIds.clear();
+        updateBatchBar();
+        table.ajax.reload();
+    });
+
+    // ── Filter Tanggal Pencairan (Cair) ───────────────
+    $('#filterPaymentDate').change(function() {
+        let val = $(this).val();
+        if (val) {
+            $('.btn-status-filter').removeClass('active');
+            $('.btn-status-filter[data-status="cair"]').addClass('active');
+            currentStatus = 'cair';
+        }
+        if (val === 'custom') {
+            $('#customPaymentDate').removeClass('d-none').focus();
+            if ($('#customPaymentDate').val()) {
+                selectedIds.clear();
+                updateBatchBar();
+                table.ajax.reload();
+            }
+        } else {
+            $('#customPaymentDate').addClass('d-none');
+            selectedIds.clear();
+            updateBatchBar();
+            table.ajax.reload();
+        }
+    });
+
+    $('#customPaymentDate').change(function() {
+        if ($(this).val()) {
+            $('.btn-status-filter').removeClass('active');
+            $('.btn-status-filter[data-status="cair"]').addClass('active');
+            currentStatus = 'cair';
+        }
+        selectedIds.clear();
+        updateBatchBar();
         table.ajax.reload();
     });
 
@@ -358,6 +427,7 @@ $(document).ready(function() {
         let count = selectedIds.size;
         if (count > 0) {
             $('#selectedCountText').text(count);
+            $('#batchPrintCount').text(count);
             $('#batchActionBar').removeClass('d-none');
         } else {
             $('#batchActionBar').addClass('d-none');
@@ -494,6 +564,19 @@ $(document).ready(function() {
             $('#sectionSequence').hide();
             $('#sectionSame').show();
         }
+    });
+
+    // ── Cetak Kwitansi Massal ───────────────────────────
+    $('#btnPrintBatchKwitansi').click(function() {
+        let count = selectedIds.size;
+        if (count === 0) {
+            Swal.fire('Peringatan', 'Silakan pilih minimal 1 kegiatan perjalanan dinas terlebih dahulu.', 'warning');
+            return;
+        }
+
+        let ids = Array.from(selectedIds).join(',');
+        let url = "{{ route($routePrefix . '.perjadin.print-batch', [], false) }}?ids=" + encodeURIComponent(ids);
+        window.open(url, '_blank');
     });
 
     $('#btnOpenBatchBku').click(function() {

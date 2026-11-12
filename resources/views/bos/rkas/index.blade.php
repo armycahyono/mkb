@@ -67,10 +67,10 @@
         font-feature-settings: 'tnum';
     }
     .stat-card {
-        border-radius: 10px;
+        border-radius: 8px;
         border: 1px solid #e2e8f0;
         background: #ffffff;
-        padding: 8px 14px;
+        padding: 6px 12px;
         position: relative;
         overflow: hidden;
         box-shadow: 0 1px 3px rgba(0,0,0,0.04);
@@ -490,13 +490,13 @@
     <!-- ======================================================== -->
     <!-- 4 CARD STATISTIK PAGU ANGGARAN (KOMPAK)                  -->
     <!-- ======================================================== -->
-    <div class="row mb-4">
+    <div class="row mb-3">
         <!-- Card 1: Pagu Anggaran -->
         <div class="col-12 col-sm-6 col-lg-3 mb-2 mb-lg-0">
             <div class="stat-card">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="text-xs font-weight-bold text-muted text-uppercase tracking-wider">Pagu Anggaran {{ $selectedYear }}</span>
-                    <a href="javascript:void(0)" class="text-primary font-weight-bold text-xs" 
+                <div class="d-flex justify-content-between align-items-center mb-0.5">
+                    <span class="font-weight-bold text-muted text-uppercase tracking-wider" style="font-size: 0.68rem;">Pagu Anggaran {{ $selectedYear }}</span>
+                    <a href="javascript:void(0)" class="text-primary font-weight-bold" style="font-size: 0.68rem;" 
                        data-toggle="modal" data-target="#modalPagu"
                        data-bs-toggle="modal" data-bs-target="#modalPagu"
                        onclick="window.showModal('#modalPagu')">
@@ -504,10 +504,10 @@
                     </a>
                 </div>
                 <div class="d-flex justify-content-between align-items-baseline">
-                    <div class="text-bold text-dark font-tabular" style="font-size: 1.18rem; line-height: 1.2;">
+                    <div class="text-bold text-dark font-tabular" style="font-size: 0.95rem; line-height: 1.2;">
                         Rp {{ number_format($stats['pagu'], 0, ',', '.') }}
                     </div>
-                    <span class="text-xs text-muted">Target BOSP</span>
+                    <span class="text-muted" style="font-size: 0.65rem;">Target BOSP</span>
                 </div>
                 <div class="bar-indicator bg-primary"></div>
             </div>
@@ -516,15 +516,15 @@
         <!-- Card 2: Sudah Dianggarkan -->
         <div class="col-12 col-sm-6 col-lg-3 mb-2 mb-lg-0">
             <div class="stat-card">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="text-xs font-weight-bold text-muted text-uppercase tracking-wider">Sudah Dianggarkan</span>
-                    <span class="badge badge-success px-1.5 py-0.5 font-weight-bold" style="font-size: 0.72rem;">{{ $stats['persen'] }}%</span>
+                <div class="d-flex justify-content-between align-items-center mb-0.5">
+                    <span class="font-weight-bold text-muted text-uppercase tracking-wider" style="font-size: 0.68rem;">Sudah Dianggarkan</span>
+                    <span class="badge badge-success px-1.5 py-0 font-weight-bold" style="font-size: 0.65rem;">{{ $stats['persen'] }}%</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-baseline">
-                    <div class="text-bold text-success font-tabular" style="font-size: 1.18rem; line-height: 1.2;">
+                    <div class="text-bold text-success font-tabular" style="font-size: 0.95rem; line-height: 1.2;">
                         Rp {{ number_format($stats['teranggarkan'], 0, ',', '.') }}
                     </div>
-                    <span class="text-xs text-muted">Alokasi Rencana</span>
+                    <span class="text-muted" style="font-size: 0.65rem;">Alokasi Rencana</span>
                 </div>
                 <div class="bar-indicator bg-success"></div>
             </div>
@@ -533,28 +533,28 @@
         <!-- Card 3: Sisa / Kekurangan Pagu -->
         <div class="col-12 col-sm-6 col-lg-3 mb-2 mb-lg-0">
             <div class="stat-card">
-                <div class="d-flex justify-content-between align-items-center mb-1">
+                <div class="d-flex justify-content-between align-items-center mb-0.5">
                     @if($stats['sisa'] >= 0)
-                        <span class="text-xs font-weight-bold text-muted text-uppercase tracking-wider">Sisa Pagu Belum Alokasi</span>
-                        <span class="badge badge-warning px-1.5 py-0.5 text-dark font-weight-bold" style="font-size: 0.72rem;">
+                        <span class="font-weight-bold text-muted text-uppercase tracking-wider" style="font-size: 0.68rem;">Sisa Pagu Belum Alokasi</span>
+                        <span class="badge badge-warning px-1.5 py-0 text-dark font-weight-bold" style="font-size: 0.65rem;">
                             Sisa {{ round(100 - $stats['persen'], 1) }}%
                         </span>
                     @else
-                        <span class="text-xs font-weight-bold text-danger text-uppercase tracking-wider">Defisit / Over Pagu</span>
-                        <span class="badge badge-danger px-1.5 py-0.5 font-weight-bold" style="font-size: 0.72rem;">
+                        <span class="font-weight-bold text-danger text-uppercase tracking-wider" style="font-size: 0.68rem;">Defisit / Over Pagu</span>
+                        <span class="badge badge-danger px-1.5 py-0 font-weight-bold" style="font-size: 0.65rem;">
                             Over {{ round($stats['persen'] - 100, 1) }}%
                         </span>
                     @endif
                 </div>
                 <div class="d-flex justify-content-between align-items-baseline">
-                    <div class="text-bold {{ $stats['sisa'] >= 0 ? 'text-warning' : 'text-danger' }} font-tabular" style="font-size: 1.18rem; line-height: 1.2;">
+                    <div class="text-bold {{ $stats['sisa'] >= 0 ? 'text-warning' : 'text-danger' }} font-tabular" style="font-size: 0.95rem; line-height: 1.2;">
                         @if($stats['sisa'] >= 0)
                             Rp {{ number_format($stats['sisa'], 0, ',', '.') }}
                         @else
                             -Rp {{ number_format(abs($stats['sisa']), 0, ',', '.') }}
                         @endif
                     </div>
-                    <span class="text-xs text-muted">Status Neraca</span>
+                    <span class="text-muted" style="font-size: 0.65rem;">Status Neraca</span>
                 </div>
                 <div class="bar-indicator {{ $stats['sisa'] >= 0 ? 'bg-warning' : 'bg-danger' }}"></div>
             </div>
@@ -563,15 +563,15 @@
         <!-- Card 4: Total Rencana Barang -->
         <div class="col-12 col-sm-6 col-lg-3">
             <div class="stat-card">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="text-xs font-weight-bold text-muted text-uppercase tracking-wider">Total Item RKAS</span>
-                    <span class="font-weight-bold text-xs" style="color: #7c3aed;">{{ $stats['recurring_items'] }} Rutin</span>
+                <div class="d-flex justify-content-between align-items-center mb-0.5">
+                    <span class="font-weight-bold text-muted text-uppercase tracking-wider" style="font-size: 0.68rem;">Total Item RKAS</span>
+                    <span class="font-weight-bold" style="color: #7c3aed; font-size: 0.68rem;">{{ $stats['recurring_items'] }} Rutin</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-baseline">
-                    <div class="text-bold text-dark font-tabular" style="font-size: 1.18rem; line-height: 1.2;">
-                        {{ $stats['total_items'] }} <small class="text-muted font-weight-normal" style="font-size: 0.78rem;">Pos Belanja</small>
+                    <div class="text-bold text-dark font-tabular" style="font-size: 0.95rem; line-height: 1.2;">
+                        {{ $stats['total_items'] }} <small class="text-muted font-weight-normal" style="font-size: 0.68rem;">Pos Belanja</small>
                     </div>
-                    <span class="text-xs text-muted">Terdata</span>
+                    <span class="text-muted" style="font-size: 0.65rem;">Terdata</span>
                 </div>
                 <div class="bar-indicator" style="background-color: #8b5cf6;"></div>
             </div>
@@ -698,7 +698,7 @@
                         <th class="text-right" style="width: 130px;">Harga Satuan</th>
                         <th class="text-right" style="width: 140px;">Total Anggaran</th>
                         <th class="text-center" style="width: 130px;">Status Terpadu</th>
-                        <th class="text-center" style="width: 100px;">Aksi</th>
+                        <th class="text-center" style="width: 115px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -806,6 +806,28 @@
                                     }
                                 @endphp
                                 <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-default text-info btn-sm btn-view" 
+                                            title="Lihat Detail Item"
+                                            data-id="{{ $item->id }}"
+                                            data-nama="{{ e($item->nama_barang) }}"
+                                            data-spek="{{ e($item->spesifikasi) }}"
+                                            data-kegiatan="{{ e($item->kegiatan) }}"
+                                            data-kegiatan-sekolah="{{ e($item->kegiatanSekolah ? $item->kegiatanSekolah->nama : $item->kegiatan_sekolah) }}"
+                                            data-kegiatan-sekolah-color="{{ $item->kegiatanSekolah ? $item->kegiatanSekolah->color : '#4f46e5' }}"
+                                            data-kode-rekening="{{ e($item->kode_rekening) }}"
+                                            data-pemohon="{{ e($item->guru ? $item->guru->name : ($item->pemohon ? $item->pemohon->name : 'Bendahara/Sekolah')) }}"
+                                            data-volume="{{ rtrim(rtrim(number_format($item->volume, 2, ',', '.'), '0'), ',') }}"
+                                            data-satuan="{{ e($item->satuan) }}"
+                                            data-harga="Rp {{ number_format($item->harga, 0, ',', '.') }}"
+                                            data-jumlah="Rp {{ number_format($item->jumlah, 0, ',', '.') }}"
+                                            data-bulan="{{ $item->bulan_pakai }}"
+                                            data-keterangan="{{ e($item->keterangan) }}"
+                                            data-is-recurring="{{ $item->is_recurring ? 1 : 0 }}"
+                                            data-utility-name="{{ e($item->utilityProfile?->name) }}"
+                                            data-terpadu-count="{{ $item->kertasKerjaItems->count() }}"
+                                            data-cards="{{ json_encode($cardsData) }}">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
                                     <button type="button" class="btn btn-default text-primary btn-sm btn-edit" 
                                             title="Ubah Item"
                                             data-id="{{ $item->id }}"
@@ -1440,6 +1462,110 @@
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: LIHAT DETAIL ITEM RKAS                             -->
+<!-- ======================================================== -->
+<div class="modal fade" id="modalViewItem" tabindex="-1" role="dialog" aria-labelledby="modalViewItemLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-info text-white py-2.5 px-3">
+                <h5 class="modal-title font-weight-bold" id="modalViewItemLabel" style="font-size: 0.95rem;">
+                    <i class="fas fa-eye mr-1"></i> Detail Rencana Item RKAS
+                </h5>
+                <button type="button" class="btn-close text-white close" data-dismiss="modal" data-bs-dismiss="modal" onclick="window.hideModal('#modalViewItem')" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <h5 class="font-weight-bold text-dark mb-1" id="viewNamaBarang" style="font-size: 1.05rem;"></h5>
+                        <div id="viewUtilityBadge" class="d-none">
+                            <span class="badge badge-pill badge-warning text-dark" style="font-size: 0.72rem;">
+                                <i class="fas fa-bolt mr-1"></i> <span id="viewUtilityName"></span>
+                            </span>
+                        </div>
+                    </div>
+                    <span id="viewStatusTerpadu"></span>
+                </div>
+
+                <div class="card card-outline card-secondary mb-3 shadow-none">
+                    <div class="card-header py-1 px-3 bg-light">
+                        <span class="font-weight-bold text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                            <i class="fas fa-cube mr-1"></i> Spesifikasi & Keterangan
+                        </span>
+                    </div>
+                    <div class="card-body p-2.5" style="background-color: #f8fafc; font-size: 0.82rem;">
+                        <div id="viewSpesifikasiWrap" class="mb-1">
+                            <strong class="text-muted">Spek:</strong> <span id="viewSpesifikasi" class="text-dark"></span>
+                        </div>
+                        <div id="viewKeteranganWrap" class="text-info mt-1">
+                            <i class="fas fa-info-circle mr-1"></i><span id="viewKeterangan"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <div class="p-2 border rounded bg-light" style="font-size: 0.82rem;">
+                            <div class="text-muted small font-weight-bold mb-1"><i class="fas fa-list-check text-primary mr-1"></i>Kegiatan ARKAS:</div>
+                            <div id="viewKegiatan" class="font-weight-600 text-dark mb-2"></div>
+                            
+                            <div class="text-muted small font-weight-bold mb-1"><i class="fas fa-bookmark text-indigo mr-1"></i>Kegiatan Sekolah:</div>
+                            <div id="viewKegiatanSekolahWrap">
+                                <span id="viewKegiatanSekolahBadge" class="badge text-white px-2 py-1 font-weight-bold"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-2 border rounded bg-light" style="font-size: 0.82rem;">
+                            <div class="text-muted small font-weight-bold mb-1"><i class="fas fa-barcode text-warning mr-1"></i>Kode Rekening:</div>
+                            <div id="viewKodeRekening" class="font-monospace text-dark font-weight-bold mb-2"></div>
+
+                            <div class="text-muted small font-weight-bold mb-1"><i class="fas fa-user-tag text-info mr-1"></i>Pemohon / Penanggung Jawab:</div>
+                            <div id="viewPemohon" class="text-dark font-weight-600"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive border rounded mb-3">
+                    <table class="table table-sm table-bordered mb-0" style="font-size: 0.82rem;">
+                        <thead class="bg-light text-muted font-weight-bold">
+                            <tr>
+                                <th class="text-center">Alokasi Bulan</th>
+                                <th class="text-center">Volume</th>
+                                <th class="text-center">Satuan</th>
+                                <th class="text-right">Harga Satuan</th>
+                                <th class="text-right">Total Anggaran</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="text-center align-middle font-weight-bold text-primary" id="viewBulan"></td>
+                                <td class="text-center align-middle font-weight-bold text-dark" id="viewVolume"></td>
+                                <td class="text-center align-middle text-muted" id="viewSatuan"></td>
+                                <td class="text-right align-middle text-dark font-tabular" id="viewHarga"></td>
+                                <td class="text-right align-middle font-weight-bold text-success font-tabular" id="viewJumlah" style="font-size: 0.95rem;"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="viewRecurringWrapper" class="d-none border rounded p-2.5 bg-light mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="font-weight-bold text-purple small"><i class="fas fa-sync-alt mr-1"></i>Rincian Alokasi Bulanan (Item Rutin):</span>
+                    </div>
+                    <div id="viewRecurringMonths" class="d-flex flex-wrap" style="gap: 6px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2 px-3 d-flex justify-content-between">
+                <button type="button" class="btn btn-default btn-sm font-weight-bold px-3" data-dismiss="modal" data-bs-dismiss="modal" onclick="window.hideModal('#modalViewItem')">Tutup</button>
+                <button type="button" class="btn btn-primary btn-sm font-weight-bold px-3" id="viewBtnEdit">
+                    <i class="fas fa-pen mr-1"></i> Ubah Item Ini
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -2883,6 +3009,127 @@
                     window.showModal(target);
                     return;
                 }
+            }
+
+            // View button handler
+            const btnView = e.target.closest('.btn-view');
+            if (btnView) {
+                const id = btnView.dataset.id;
+                const nama = btnView.dataset.nama || '';
+                const spek = btnView.dataset.spek || '';
+                const kegiatan = btnView.dataset.kegiatan || '-';
+                const ksNama = btnView.dataset.kegiatanSekolah || '';
+                const ksColor = btnView.dataset.kegiatanSekolahColor || '#4f46e5';
+                const kodeRekening = btnView.dataset.kodeRekening || '-';
+                const pemohon = btnView.dataset.pemohon || 'Bendahara/Sekolah';
+                const volume = btnView.dataset.volume || '0';
+                const satuan = btnView.dataset.satuan || 'Unit';
+                const harga = btnView.dataset.harga || 'Rp 0';
+                const jumlah = btnView.dataset.jumlah || 'Rp 0';
+                const bulan = btnView.dataset.bulan || '-';
+                const keterangan = btnView.dataset.keterangan || '';
+                const isRecurring = btnView.dataset.isRecurring === '1';
+                const utilityName = btnView.dataset.utilityName || '';
+                const terpaduCount = parseInt(btnView.dataset.terpaduCount || '0', 10);
+                const cardsRaw = btnView.dataset.cards;
+
+                document.getElementById('viewNamaBarang').textContent = nama;
+
+                // Utility badge
+                const utilBadge = document.getElementById('viewUtilityBadge');
+                if (utilityName) {
+                    document.getElementById('viewUtilityName').textContent = 'Utilitas: ' + utilityName;
+                    utilBadge.classList.remove('d-none');
+                } else {
+                    utilBadge.classList.add('d-none');
+                }
+
+                // Terpadu badge
+                const statusTerpadu = document.getElementById('viewStatusTerpadu');
+                if (terpaduCount > 0) {
+                    statusTerpadu.innerHTML = `<span class="badge badge-success px-2 py-1" style="font-size: 0.75rem;"><i class="fas fa-check-circle mr-1"></i>Terpadu (${terpaduCount})</span>`;
+                } else {
+                    statusTerpadu.innerHTML = `<span class="badge badge-light border text-muted px-2 py-1" style="font-size: 0.75rem;"><i class="fas fa-circle-notch mr-1 text-warning"></i>Belum Padu</span>`;
+                }
+
+                // Spek & Keterangan
+                const spekWrap = document.getElementById('viewSpesifikasiWrap');
+                if (spek) {
+                    document.getElementById('viewSpesifikasi').textContent = spek;
+                    spekWrap.classList.remove('d-none');
+                } else {
+                    spekWrap.classList.add('d-none');
+                }
+
+                const ketWrap = document.getElementById('viewKeteranganWrap');
+                if (keterangan) {
+                    document.getElementById('viewKeterangan').textContent = keterangan;
+                    ketWrap.classList.remove('d-none');
+                } else {
+                    ketWrap.classList.add('d-none');
+                }
+
+                // Kegiatan & Rekening
+                document.getElementById('viewKegiatan').textContent = kegiatan;
+                const ksBadge = document.getElementById('viewKegiatanSekolahBadge');
+                if (ksNama && ksNama !== '-') {
+                    ksBadge.textContent = ksNama;
+                    ksBadge.style.backgroundColor = ksColor;
+                    document.getElementById('viewKegiatanSekolahWrap').classList.remove('d-none');
+                } else {
+                    document.getElementById('viewKegiatanSekolahWrap').classList.add('d-none');
+                }
+
+                document.getElementById('viewKodeRekening').textContent = kodeRekening;
+                document.getElementById('viewPemohon').textContent = pemohon;
+
+                // Numbers
+                document.getElementById('viewBulan').textContent = bulan;
+                document.getElementById('viewVolume').textContent = volume;
+                document.getElementById('viewSatuan').textContent = satuan;
+                document.getElementById('viewHarga').textContent = harga;
+                document.getElementById('viewJumlah').textContent = jumlah;
+
+                // Recurring months
+                const recWrap = document.getElementById('viewRecurringWrapper');
+                const recContainer = document.getElementById('viewRecurringMonths');
+                recContainer.innerHTML = '';
+                if (isRecurring && cardsRaw) {
+                    try {
+                        const cards = JSON.parse(cardsRaw);
+                        if (Array.isArray(cards) && cards.length > 0) {
+                            cards.forEach(c => {
+                                const pill = document.createElement('span');
+                                pill.className = 'badge border px-2 py-1 font-tabular';
+                                pill.style.cssText = 'font-size: 0.75rem; background: #ffffff; color: #475569;';
+                                pill.innerHTML = `<strong>${c.month}</strong>: ${c.volume} ${c.unit || satuan}`;
+                                recContainer.appendChild(pill);
+                            });
+                            recWrap.classList.remove('d-none');
+                        } else {
+                            recWrap.classList.add('d-none');
+                        }
+                    } catch(err) {
+                        recWrap.classList.add('d-none');
+                    }
+                } else {
+                    recWrap.classList.add('d-none');
+                }
+
+                // Edit button in view modal
+                const viewBtnEdit = document.getElementById('viewBtnEdit');
+                if (viewBtnEdit) {
+                    viewBtnEdit.onclick = function() {
+                        window.hideModal('#modalViewItem');
+                        const editBtn = document.querySelector(`.btn-edit[data-id="${id}"]`);
+                        if (editBtn) {
+                            setTimeout(() => editBtn.click(), 150);
+                        }
+                    };
+                }
+
+                window.showModal('#modalViewItem');
+                return;
             }
 
             // Edit button handler

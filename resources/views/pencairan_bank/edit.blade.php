@@ -182,9 +182,6 @@
             </h6>
             <div class="d-flex align-items-center mt-1 mt-sm-0 flex-wrap" style="gap: 6px;">
                 @if($fundingSource === 'BOSP')
-                <button type="button" id="btnPullUtilitas" class="btn btn-sm btn-outline-warning text-dark font-weight-bold">
-                    <i class="fas fa-bolt mr-1"></i> Tarik Tagihan Utilitas
-                </button>
                 <button type="button" id="btnPullRencanaNota" class="btn btn-sm btn-outline-info font-weight-bold">
                     <i class="fas fa-cart-shopping mr-1"></i> Tarik Rencana Belanja
                 </button>
@@ -328,52 +325,6 @@
     </div>
 </div>
 
-{{-- Modal Tarik Tagihan Utilitas --}}
-<div class="modal fade" id="modalPullUtilitas" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content shadow">
-            <div class="modal-header py-2 bg-warning text-dark">
-                <h6 class="modal-title font-weight-bold"><i class="fas fa-bolt mr-1"></i> Pilih Tagihan Utilitas yang Belum Dicairkan (Reimburse)</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" data-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-3">
-                <div id="loadingUtilitas" class="text-center py-4">
-                    <i class="fas fa-spinner fa-spin fa-2x text-warning mb-2"></i>
-                    <div class="text-muted small">Memuat tagihan utilitas belum cair...</div>
-                </div>
-                <div id="contentUtilitas" style="display: none;">
-                    <div class="alert alert-info py-2 px-3 mb-2 small">
-                        <i class="fas fa-info-circle mr-1"></i> Semua tagihan utilitas berstatus reimburse kepada staf/guru yang telah membayar struk. Anda dapat menyesuaikan/membulatkan nominal transfer jika diperlukan sebelum atau sesudah memasukkannya ke daftar TNT.
-                    </div>
-                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                        <table class="table table-sm table-hover table-bordered mb-0" id="tableUnpaidUtilitas" style="font-size: 0.8rem;">
-                            <thead class="bg-light text-center">
-                                <tr>
-                                    <th width="4%"><input type="checkbox" id="checkAllUtilitas"></th>
-                                    <th width="14%">Tanggal & Periode</th>
-                                    <th width="24%">Objek Tagihan</th>
-                                    <th width="22%">Kertas Kerja (BOS)</th>
-                                    <th width="22%">Penerima Reimburse & Rekening</th>
-                                    <th width="14%" class="text-right">Nominal Riil</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tbodyUnpaidUtilitas"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer py-2 bg-light d-flex justify-content-between">
-                <span class="text-muted small"><i class="fas fa-check-double mr-1"></i> Pilih tagihan untuk dimasukkan ke Surat TNT.</span>
-                <div>
-                    <button type="button" class="btn btn-sm btn-secondary mr-1" data-bs-dismiss="modal" data-dismiss="modal">Tutup</button>
-                    <button type="button" id="btnInsertUtilitas" class="btn btn-sm btn-warning font-weight-bold">
-                        <i class="fas fa-plus mr-1"></i> Masukkan ke Surat TNT
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 @stop
 
 @section('js')
@@ -419,7 +370,7 @@ function formatVaAccountNumber(accNum, defaultBank = 'Bank Jatim') {
     return 'VA. ' + str;
 }
 
-function addItemRow(recipient = '', accNum = '', amount = 0, desc = '', type = 'perjadin', perjadinItemId = '', rencanaNotaId = '', isOnline = false, utilityReceiptId = '') {
+function addItemRow(recipient = '', accNum = '', amount = 0, desc = '', type = 'perjadin', perjadinItemId = '', rencanaNotaId = '', isOnline = false, utilityReceiptId = '', isUtilitas = false) {
     if (type === 'perjadin' && (!desc || desc.startsWith('Perjadin:'))) {
         desc = 'Perjadin';
     }
@@ -438,7 +389,9 @@ function addItemRow(recipient = '', accNum = '', amount = 0, desc = '', type = '
     if (type === 'perjadin') {
         typeBadge = '<span class="badge badge-info px-2 py-1"><i class="fas fa-car mr-1"></i>Perjadin</span>';
     } else if (type === 'rencana_nota') {
-        if (isOnline) {
+        if (isUtilitas) {
+            typeBadge = '<span class="badge badge-warning text-dark px-2 py-1"><i class="fas fa-bolt mr-1"></i>Utilitas</span>';
+        } else if (isOnline) {
             typeBadge = '<span class="badge badge-warning text-dark px-2 py-1"><i class="fas fa-store mr-1"></i>Online</span>';
         } else {
             typeBadge = '<span class="badge badge-primary px-2 py-1"><i class="fas fa-cart-shopping mr-1"></i>Rencana Belanja</span>';
@@ -504,11 +457,12 @@ $(document).ready(function() {
             let rencanaId = item.rencana_belanja ? item.rencana_belanja.id : '';
             let utilityId = item.utility_receipt ? item.utility_receipt.id : '';
             let isOnline = item.rencana_belanja ? (item.rencana_belanja.is_online || (item.account_number && item.account_number.toUpperCase().startsWith('VA.'))) : (item.account_number && item.account_number.toUpperCase().startsWith('VA.'));
+            let isUtilitas = (item.type === 'utilitas' || (item.rencana_belanja && item.rencana_belanja.type === 'utilitas'));
             let desc = item.description || '';
             if (desc.startsWith('Belanja: ')) {
                 desc = desc.substring(9).trim();
             }
-            addItemRow(item.recipient_name, item.account_number, item.amount, desc, item.type, perjadinId, rencanaId, isOnline, utilityId);
+            addItemRow(item.recipient_name, item.account_number, item.amount, desc, item.type, perjadinId, rencanaId, isOnline, utilityId, isUtilitas);
         });
     } else {
         addItemRow('', '', 0, '', 'belanja', '', '', false);
@@ -705,6 +659,13 @@ $(document).ready(function() {
 
                     let summaryHtml = item.items_summary ? `<div class="text-secondary small mt-1" style="font-size: 0.75rem;"><i class="fas fa-box mr-1 text-muted"></i>${item.items_summary}</div>` : '';
 
+                    let typeBadge = '';
+                    if (item.type === 'utilitas') {
+                        typeBadge = '<span class="badge badge-warning text-dark" style="font-size: 0.68rem;"><i class="fas fa-bolt mr-1"></i>Utilitas</span>';
+                    } else if (item.is_online) {
+                        typeBadge = `<span class="badge badge-warning text-dark" style="font-size: 0.68rem;"><i class="fas fa-store mr-1"></i>${item.marketplace_name}</span> <span class="badge badge-light border text-success font-tabular" style="font-size: 0.68rem;">VA: ${item.account_number || '-'}</span>`;
+                    }
+
                     html += `
                     <tr class="${item.has_conflict ? 'table-warning' : ''}">
                         <td class="text-center align-middle">
@@ -722,7 +683,7 @@ $(document).ready(function() {
                         <td class="align-middle">
                             <span class="font-weight-500">${item.supplier_name}</span>
                             ${item.recipient_name ? `<br><small class="text-dark"><i class="far fa-user mr-1 text-muted"></i>a.n. <strong>${item.recipient_name}</strong></small>` : ''}
-                            ${item.is_online ? `<br><span class="badge badge-warning text-dark" style="font-size: 0.68rem;"><i class="fas fa-store mr-1"></i>${item.marketplace_name}</span> <span class="badge badge-light border text-success font-tabular" style="font-size: 0.68rem;">VA: ${item.account_number || '-'}</span>` : ''}
+                            ${typeBadge ? `<br>${typeBadge}` : ''}
                         </td>
                         <td class="text-center align-middle font-tabular">
                             ${item.items_count} Item
@@ -768,7 +729,8 @@ $(document).ready(function() {
             if (desc.startsWith('Belanja: ')) {
                 desc = desc.substring(9).trim();
             }
-            addItemRow(recipient, accString, item.total_amount, desc, 'rencana_nota', '', item.id, item.is_online);
+            let isUtilitas = (item.type === 'utilitas');
+            addItemRow(recipient, accString, item.total_amount, desc, 'rencana_nota', '', item.id, item.is_online, '', isUtilitas);
         });
 
         let modalEl = document.getElementById('modalPullRencanaNota');
@@ -811,119 +773,6 @@ $(document).ready(function() {
         }
 
         doInsertSelectedRencana(selectedIndexes);
-    });
-
-    let unpaidUtilitasList = [];
-
-    $('#btnPullUtilitas').click(function() {
-        let modalEl = document.getElementById('modalPullUtilitas');
-        if (window.bootstrap && window.bootstrap.Modal) {
-            bootstrap.Modal.getOrCreateInstance(modalEl).show();
-        } else if (window.$ && typeof $(modalEl).modal === 'function') {
-            $(modalEl).modal('show');
-        }
-
-        $('#loadingUtilitas').show();
-        $('#contentUtilitas').hide();
-
-        $.ajax({
-            url: "{{ route($routePrefix . '.api.unpaid-utility-receipts', [], false) }}",
-            type: 'GET',
-            dataType: 'json',
-            success: function(data) {
-                unpaidUtilitasList = data;
-                $('#loadingUtilitas').hide();
-                $('#contentUtilitas').show();
-
-                if (data.length === 0) {
-                    $('#tbodyUnpaidUtilitas').html('<tr><td colspan="6" class="text-center py-3 text-muted">Semua tagihan utilitas sudah dicairkan atau belum ada bukti pembayaran tersimpan.</td></tr>');
-                    return;
-                }
-
-                let html = '';
-                data.forEach(function(item, idx) {
-                    let budgetedBadge = item.is_budgeted
-                        ? '<span class="badge badge-info mr-1"><i class="fas fa-link mr-1"></i>BOS</span>'
-                        : '<span class="badge badge-secondary mr-1"><i class="fas fa-shield-alt mr-1"></i>Non-Anggaran</span>';
-
-                    let kkDisplay = '';
-                    if (!item.is_budgeted) {
-                        kkDisplay = '<span class="text-muted small"><em>Non-BOS (Internal)</em></span>';
-                    } else if (item.has_kertas_kerja) {
-                        kkDisplay = `<div class="font-weight-500 text-dark small text-truncate" style="max-width: 200px;" title="${item.kertas_kerja_desc}">${item.kertas_kerja_desc}</div>`;
-                    } else {
-                        kkDisplay = '<span class="badge badge-warning text-dark"><i class="fas fa-exclamation-circle mr-1"></i>Belum Terhubung</span>';
-                    }
-
-                    html += `
-                    <tr>
-                        <td class="text-center align-middle">
-                            <input type="checkbox" class="check-utilitas-item" data-id="${item.id}" value="${idx}">
-                        </td>
-                        <td class="align-middle">
-                            <div class="font-weight-bold font-tabular text-dark">${item.transaction_date}</div>
-                            <small class="text-muted">${item.billing_month} ${item.fiscal_year}</small>
-                        </td>
-                        <td class="align-middle">
-                            <div class="font-weight-bold text-dark">${item.profile_name}</div>
-                            <div class="mt-0.5">${budgetedBadge}</div>
-                        </td>
-                        <td class="align-middle">
-                            ${kkDisplay}
-                        </td>
-                        <td class="align-middle">
-                            <div class="font-weight-bold text-dark">${item.recipient_name}</div>
-                            <div class="small font-tabular text-muted">${item.bank_name}: <strong>${item.account_number}</strong></div>
-                        </td>
-                        <td class="text-right align-middle font-tabular font-weight-bold text-success">
-                            ${formatRupiah(item.total_amount)}
-                        </td>
-                    </tr>
-                    `;
-                });
-                $('#tbodyUnpaidUtilitas').html(html);
-            }
-        });
-    });
-
-    $('#checkAllUtilitas').change(function() {
-        $('.check-utilitas-item').prop('checked', $(this).is(':checked'));
-    });
-
-    $('#btnInsertUtilitas').click(function() {
-        let selectedIndexes = [];
-        $('.check-utilitas-item:checked').each(function() {
-            selectedIndexes.push(parseInt($(this).val()));
-        });
-
-        if (selectedIndexes.length === 0) {
-            Swal.fire('Pilih Data', 'Pilih minimal satu tagihan utilitas untuk dimasukkan.', 'info');
-            return;
-        }
-
-        selectedIndexes.forEach(function(i) {
-            let item = unpaidUtilitasList[i];
-            let bName = (item.bank_name || 'Bank Jatim').trim();
-            let rawAcc = (item.account_number || '').trim();
-            let accString = '';
-            if (rawAcc) {
-                if (rawAcc.toUpperCase().startsWith(bName.toUpperCase() + '.')) {
-                    accString = rawAcc;
-                } else if (rawAcc.toUpperCase().startsWith(bName.toUpperCase() + ' ')) {
-                    accString = bName + '. ' + rawAcc.substring(bName.length).trim();
-                } else {
-                    accString = `${bName}. ${rawAcc}`;
-                }
-            }
-            addItemRow(item.recipient_name, accString, item.total_amount, item.description, 'utilitas', '', '', false, item.id);
-        });
-
-        let modalEl = document.getElementById('modalPullUtilitas');
-        if (window.bootstrap && window.bootstrap.Modal) {
-            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-        } else if (window.$ && typeof $(modalEl).modal === 'function') {
-            $(modalEl).modal('hide');
-        }
     });
 });
 </script>

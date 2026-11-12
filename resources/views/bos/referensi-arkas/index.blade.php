@@ -278,7 +278,7 @@
                 <h5 class="modal-title font-weight-bold" id="modalDefinisiLabel" style="font-size: 0.95rem;">
                     <i class="fas fa-circle-info mr-1"></i> Definisi Operasional Kegiatan ARKAS
                 </h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                <button type="button" class="close btn-close btn-close-white text-white" data-dismiss="modal" data-bs-dismiss="modal" onclick="window.hideModal('#modalDefinisi')" aria-label="Close" style="background: none; border: none; font-size: 1.25rem;">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
@@ -311,7 +311,7 @@
                 </div>
             </div>
             <div class="modal-footer py-2 px-3 bg-light">
-                <button type="button" class="btn btn-sm btn-secondary" data-dismiss="modal">Tutup</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-dismiss="modal" data-bs-dismiss="modal" onclick="window.hideModal('#modalDefinisi')">Tutup</button>
             </div>
         </div>
     </div>
@@ -552,6 +552,37 @@ $(document).ready(function() {
     });
 
     // ── Modal Detail Definisi Kegiatan ────────────────────────────────
+    window.hideModal = function(selector) {
+        let $el = $(selector);
+        if ($el.length && typeof $el.modal === 'function') {
+            try {
+                $el.modal('hide');
+            } catch (e) {}
+        }
+
+        let domEl = typeof selector === 'string' ? document.querySelector(selector) : selector;
+        if (domEl && window.bootstrap && typeof window.bootstrap.Modal !== 'undefined') {
+            try {
+                let inst = bootstrap.Modal.getInstance(domEl) || bootstrap.Modal.getOrCreateInstance(domEl);
+                if (inst) inst.hide();
+            } catch (e) {}
+        }
+
+        setTimeout(function() {
+            if (domEl && !$(domEl).hasClass('show')) {
+                $('body').removeClass('modal-open').css('padding-right', '');
+                $('.modal-backdrop').remove();
+            }
+        }, 200);
+    };
+
+    $(document).on('click', '[data-dismiss="modal"], [data-bs-dismiss="modal"]', function(e) {
+        let targetModal = $(this).closest('.modal');
+        if (targetModal.length) {
+            window.hideModal(targetModal);
+        }
+    });
+
     $(document).on('click', '.btn-lihat-definisi', function() {
         let kode = $(this).data('kode');
         let kegiatan = $(this).data('kegiatan');
@@ -572,7 +603,16 @@ $(document).ready(function() {
             $('#modal-contoh-wrapper').addClass('d-none');
         }
 
-        $('#modalDefinisi').modal('show');
+        let modalEl = document.getElementById('modalDefinisi');
+        if (window.bootstrap && typeof window.bootstrap.Modal !== 'undefined' && modalEl) {
+            try {
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            } catch (e) {
+                $('#modalDefinisi').modal('show');
+            }
+        } else {
+            $('#modalDefinisi').modal('show');
+        }
     });
 
 });

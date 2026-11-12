@@ -3,7 +3,7 @@
 @section('title', 'Dashboard')
 
 @section('content_header')
-    <div class="d-flex align-items-center justify-content-between">
+    <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-2">
         <div>
             <h1 class="mb-0">Dashboard</h1>
             <p class="mb-0 mt-1" style="font-size:.82rem;color:var(--mkb-text-muted)">

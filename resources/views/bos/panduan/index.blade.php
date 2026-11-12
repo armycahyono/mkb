@@ -22,7 +22,10 @@
             </ol>
         </nav>
     </div>
-    <div class="header-actions">
+    <div class="header-actions d-flex align-items-center">
+        <button id="btn-bayar-utilitas" class="btn btn-sm btn-warning text-dark font-weight-bold shadow-sm mr-2 me-2" type="button">
+            <i class="fas fa-bolt mr-1"></i> Bayar Utilitas
+        </button>
         <button id="btn-create-group" class="btn btn-sm btn-info shadow-sm" type="button">
             <i class="fas fa-cart-plus mr-1"></i> Buat Rencana Belanja (<span id="selected-count">0</span> Item Dipilih)
         </button>
@@ -58,9 +61,9 @@
 
     /* Force Table Text Alignment */
     .text-right, .text-end, th.text-right, td.text-right, th.text-end, td.text-end,
-    #table-unrealized td:nth-child(7), #table-unrealized th:nth-child(7),
-    #table-unrealized td:nth-child(8), #table-unrealized th:nth-child(8),
-    #table-groups td:nth-child(6), #table-groups th:nth-child(6),
+    #table-unrealized td:nth-child(5), #table-unrealized th:nth-child(5),
+    #table-unrealized td:nth-child(6), #table-unrealized th:nth-child(6),
+    #table-groups td:nth-child(8), #table-groups th:nth-child(8),
     #table-detail-items td:nth-child(6), #table-detail-items th:nth-child(6),
     #table-detail-items td:nth-child(7), #table-detail-items th:nth-child(7),
     #table-selected-preview td:nth-child(4), #table-selected-preview th:nth-child(4),
@@ -216,13 +219,18 @@
                         <div class="alert alert-info py-2 mb-0 flex-grow-1" style="font-size: 0.8rem;">
                             <i class="fas fa-info-circle mr-1"></i> Centang satu atau beberapa barang di bawah ini, lalu klik tombol <strong>"Buat Rencana Belanja"</strong> untuk mengelompokkan barang ke rencana belanja/supplier tertentu.
                         </div>
-                        <div class="d-inline-flex align-items-center bg-light border px-3 py-2 rounded shadow-sm">
-                            <div class="custom-control custom-checkbox">
-                                <input type="checkbox" class="custom-control-input" id="filter-hide-planned" checked>
-                                <label class="custom-control-label small font-weight-bold text-dark cursor-pointer mb-0" for="filter-hide-planned">
-                                    Sembunyikan barang yang sudah 100% masuk Rencana
-                                </label>
+                        <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
+                            <div class="d-inline-flex align-items-center bg-light border px-3 py-1 rounded shadow-sm" style="height: 31px;">
+                                <div class="custom-control custom-checkbox">
+                                    <input type="checkbox" class="custom-control-input" id="filter-hide-planned" checked>
+                                    <label class="custom-control-label small font-weight-bold text-dark cursor-pointer mb-0" for="filter-hide-planned">
+                                        Sembunyikan barang yang sudah 100% masuk Rencana
+                                    </label>
+                                </div>
                             </div>
+                            <button type="button" class="btn btn-sm btn-success font-weight-bold d-inline-flex align-items-center shadow-xs" id="btn-export-unrealized" style="height: 31px; font-size: 0.8125rem; padding: 0.25rem 0.75rem; border-radius: 4px;" title="Export Excel Barang Belum Dibelanjakan (s/d Bulan ini, dikelompokkan per Program)">
+                                <i class="fas fa-file-excel mr-1 me-1"></i> Export Excel
+                            </button>
                         </div>
                     </div>
 
@@ -233,15 +241,13 @@
                                     <th width="30" class="text-center">
                                         <input type="checkbox" id="check-all">
                                     </th>
-                                    <th width="95" class="text-center">KODE REK</th>
-                                    <th width="85" class="text-center">PROGRAM</th>
-                                    <th width="180" class="text-left">URAIAN / BARANG</th>
-                                    <th width="65" class="text-center">SISA VOL</th>
-                                    <th width="60" class="text-center">SATUAN</th>
-                                    <th width="115" class="text-right">HARGA SATUAN</th>
-                                    <th width="125" class="text-right">TOTAL</th>
+                                    <th width="75" class="text-center">PROGRAM</th>
+                                    <th class="text-left">URAIAN / BARANG</th>
+                                    <th width="85" class="text-center">SISA VOL</th>
+                                    <th width="110" class="text-right text-end">HARGA (RP)</th>
+                                    <th width="115" class="text-right text-end">TOTAL (Rp)</th>
                                     <th width="95" class="text-center">ALOKASI BULAN</th>
-                                    <th width="280" class="text-left">KEGIATAN</th>
+                                    <th width="260" class="text-left">KEGIATAN / KODE REK</th>
                                 </tr>
                             </thead>
                         </table>
@@ -259,12 +265,12 @@
                                 <span class="input-group-text bg-light text-muted font-weight-bold d-inline-flex align-items-center" style="height: 31px; font-size: 0.8125rem; border-radius: 4px 0 0 4px; padding: 0 10px;">
                                     <i class="fas fa-filter mr-1 me-1 text-primary"></i> Status:
                                 </span>
-                                <select id="filter-group-status" class="form-select form-select-sm custom-select custom-select-sm font-weight-bold text-dark" style="height: 31px; font-size: 0.8125rem; border-radius: 0 4px 4px 0; cursor: pointer; width: auto; min-width: 160px;">
+                                <select id="filter-group-status" class="form-select form-select-sm custom-select custom-select-sm font-weight-bold text-dark" style="height: 31px; font-size: 0.8125rem; border-radius: 0 4px 4px 0; cursor: pointer; width: auto; min-width: 140px;">
                                     <option value="">Semua Status</option>
-                                    <option value="draft">Draft Rencana</option>
-                                    <option value="ordered">Sudah Diorder</option>
-                                    <option value="diajukan_ke_bank">Diajukan ke TNT</option>
-                                    <option value="realized">Sudah Direalisasikan</option>
+                                    <option value="draft">Draft</option>
+                                    <option value="ordered">Order</option>
+                                    <option value="diajukan_ke_bank">TNT</option>
+                                    <option value="realized">Realisasi</option>
                                 </select>
                             </div>
                             <button type="button" class="btn btn-sm btn-outline-info font-weight-bold d-inline-flex align-items-center shadow-xs" id="btn-expand-all" style="height: 31px; font-size: 0.8125rem; padding: 0.25rem 0.65rem; border-radius: 4px;" title="Buka seluruh rincian rencana belanja">
@@ -272,6 +278,9 @@
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-secondary font-weight-bold d-inline-flex align-items-center shadow-xs" id="btn-collapse-all" style="height: 31px; font-size: 0.8125rem; padding: 0.25rem 0.65rem; border-radius: 4px;" title="Tutup seluruh rincian rencana belanja">
                                 <i class="fas fa-compress-alt mr-1"></i> Tutup Semua
+                            </button>
+                            <button type="button" class="btn btn-sm btn-success font-weight-bold d-inline-flex align-items-center shadow-xs" id="btn-export-groups" style="height: 31px; font-size: 0.8125rem; padding: 0.25rem 0.75rem; border-radius: 4px;" title="Export Excel Rincian Daftar Rencana Belanja (Draft)">
+                                <i class="fas fa-file-excel mr-1 me-1"></i> Export Excel
                             </button>
                         </div>
                     </div>
@@ -282,14 +291,14 @@
                                 <tr>
                                     <th width="32" class="text-center"></th>
                                     <th width="35" class="text-center">NO</th>
-                                    <th width="145" class="text-center">NO. RENCANA</th>
+                                    <th width="105" class="text-center">NO RB</th>
                                     <th class="text-left">JUDUL RENCANA BELANJA</th>
                                     <th class="text-left">SUPPLIER / TOKO</th>
                                     <th width="95" class="text-center">TGL RENCANA</th>
-                                    <th width="95" class="text-center">JUMLAH BARANG</th>
-                                    <th width="125" class="text-right">TOTAL ESTIMASI</th>
-                                    <th width="120" class="text-center">STATUS</th>
-                                    <th width="180" class="text-center">AKSI</th>
+                                    <th width="85" class="text-center">JUMLAH</th>
+                                    <th width="125" class="text-right text-end">TOTAL (RP)</th>
+                                    <th width="90" class="text-center">STATUS</th>
+                                    <th width="140" class="text-center">AKSI</th>
                                 </tr>
                             </thead>
                         </table>
@@ -496,10 +505,11 @@
                                     <thead class="bg-light">
                                         <tr>
                                             <th>Uraian Barang</th>
-                                            <th width="120" class="text-center">Vol Rencana</th>
-                                            <th width="80" class="text-center">Satuan</th>
-                                            <th width="150" class="text-right">Harga Satuan (Rp)</th>
-                                            <th width="160" class="text-right">Total (Rp)</th>
+                                            <th width="110" class="text-center">Vol Rencana</th>
+                                            <th width="75" class="text-center">Satuan</th>
+                                            <th width="140" class="text-right">Harga Satuan (Rp)</th>
+                                            <th width="150" class="text-right">Total (Rp)</th>
+                                            <th width="45" class="text-center" title="Aksi"><i class="fas fa-trash-alt text-muted"></i></th>
                                         </tr>
                                     </thead>
                                     <tbody></tbody>
@@ -507,6 +517,7 @@
                                         <tr>
                                             <th colspan="4" class="text-right font-weight-bold">Total Rencana Belanja:</th>
                                             <th id="edit-modal-grand-total" class="font-weight-bold text-primary font-tabular">Rp 0</th>
+                                            <th></th>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -636,6 +647,128 @@
             </form>
         </div>
     </div>
+
+    <!-- Modal Bayar Utilitas (Bundling Tagihan Utilitas ke Rencana Belanja) -->
+    <div class="modal fade" id="modalBayarUtilitas" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered" role="document" style="max-width: 1120px;">
+            <form id="formBayarUtilitas">
+                @csrf
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+                        <h5 class="modal-title font-weight-bold" style="font-size: 1.05rem;">
+                            <i class="fas fa-bolt mr-2 text-dark"></i>Bayar Tagihan Utilitas (Bundling ke Rencana Belanja & TNT)
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body py-3">
+                        <div class="alert alert-info py-2 mb-3 shadow-xs" style="font-size: 0.81rem; line-height: 1.45;">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Pilih tagihan utilitas bulan ini (listrik, internet, telepon) yang telah ditalangi untuk dibundel menjadi <strong>1 Paket Rencana Belanja Utilitas</strong>. Paket ini otomatis menarik rekening petugas talangan untuk penarikan Surat TNT Bank Jatim.
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-3 form-group mb-2">
+                                <label class="font-weight-bold" style="font-size: 0.78rem;">Alokasi Tagihan Bulan <span class="text-danger">*</span></label>
+                                <select id="util-filter-month" class="form-select form-select-sm custom-select custom-select-sm font-weight-bold text-dark" style="height: 31px; font-size: 0.8125rem;">
+                                    @foreach($indonesianMonths as $m)
+                                        <option value="{{ $m }}" {{ $m == $currentMonthName ? 'selected' : '' }}>{{ $m }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-3 form-group mb-2">
+                                <label class="font-weight-bold" style="font-size: 0.78rem;">No. Rencana Belanja <span class="text-danger">*</span></label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" id="util-no-nota" name="no_nota" class="form-control form-control-sm font-tabular font-weight-bold text-info" placeholder="Otomatis..." required>
+                                    <button class="btn btn-outline-secondary" type="button" id="btn-refresh-util-no-nota" title="Generate ulang nomor"><i class="fas fa-sync-alt"></i></button>
+                                </div>
+                            </div>
+                            <div class="col-md-3 form-group mb-2">
+                                <label class="font-weight-bold" style="font-size: 0.78rem;">Tgl Rencana Belanja</label>
+                                <input type="date" name="planned_date" id="util-planned-date" class="form-control form-control-sm" value="{{ date('Y-m-d') }}">
+                            </div>
+                            <div class="col-md-3 form-group mb-2">
+                                <label class="font-weight-bold" style="font-size: 0.78rem;">Petugas Talangan (Reimburse) <span class="text-danger">*</span></label>
+                                <select name="guru_id" id="util-guru-id" class="form-select form-select-sm custom-select custom-select-sm font-weight-bold" required></select>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 form-group mb-2">
+                                <label class="font-weight-bold" style="font-size: 0.78rem;">Judul Rencana Belanja</label>
+                                <input type="text" name="title" id="util-title" class="form-control form-control-sm" placeholder="Contoh: Bayar Utilitas dan BBM September">
+                            </div>
+                            <div class="col-md-3 form-group mb-2">
+                                <label class="font-weight-bold" style="font-size: 0.78rem;">Bank Tujuan Rekening</label>
+                                <input type="text" name="bank_name" id="util-bank-name" class="form-control form-control-sm" readonly>
+                            </div>
+                            <div class="col-md-3 form-group mb-2">
+                                <label class="font-weight-bold" style="font-size: 0.78rem;">Nomor Rekening</label>
+                                <input type="text" name="account_number" id="util-account-number" class="form-control form-control-sm font-tabular font-weight-bold text-dark" readonly>
+                            </div>
+                        </div>
+
+                        {{-- Tabel Struk Utilitas Siap Bayar --}}
+                        <div class="form-group mb-2 mt-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.82rem;">
+                                    <i class="fas fa-list-check mr-1 text-warning"></i>Daftar Struk Tagihan Utilitas Belum Masuk Rencana:
+                                </label>
+                                <a href="{{ route('bos.utilitas.index') }}" target="_blank" class="small text-primary font-weight-bold" style="font-size: 0.74rem;">
+                                    <i class="fas fa-external-link-alt mr-1"></i>Buka Modul Struk Utilitas (Upload/Scan)
+                                </a>
+                            </div>
+
+                            <div class="table-responsive border rounded" style="max-height: 330px; overflow-y: auto;">
+                                <table class="table table-bordered table-sm table-hover mb-0" id="table-utilitas-bundling">
+                                    <thead class="bg-light sticky-top" style="z-index: 2;">
+                                        <tr>
+                                            <th width="35" class="text-center">
+                                                <input type="checkbox" id="check-all-util">
+                                            </th>
+                                            <th width="210">Objek Tagihan & Nama Pelanggan</th>
+                                            <th width="300">Komponen Kertas Kerja ARKAS Terkait</th>
+                                            <th width="125" class="text-right">Nominal Struk</th>
+                                            <th width="140" class="text-right">Nominal di-TNT-kan (Rp)</th>
+                                            <th width="140" class="text-center">Info Token/Resi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody-utilitas-bundling">
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted py-4">
+                                                <i class="fas fa-spinner fa-spin mr-1"></i> Memuat data struk utilitas...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {{-- Total Summary Box --}}
+                        <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded border mt-2">
+                            <div>
+                                <span class="font-weight-bold text-muted" style="font-size: 0.8rem;">
+                                    <span id="util-selected-count" class="text-primary font-weight-bold">0</span> Tagihan Dipilih
+                                </span>
+                                <div id="util-budget-warning" class="text-danger small font-weight-bold mt-0.5 d-none">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i> Perhatian: Nominal melebihi sisa anggaran Kertas Kerja pada beberapa item!
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-muted mr-2" style="font-size: 0.82rem;">Total Reimburse Utilitas (TNT):</span>
+                                <span id="util-grand-total" class="font-weight-bold text-success font-tabular" style="font-size: 1.15rem;">Rp 0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer py-2 d-flex justify-content-between">
+                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-sm btn-warning text-dark font-weight-bold" id="btn-save-util-group">
+                            <i class="fas fa-check-circle mr-1"></i> Simpan Paket Rencana Belanja Utilitas
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
 @stop
 
 @section('js')
@@ -680,7 +813,7 @@ $(document).ready(function() {
         serverSide: true,
         pageLength: 50,
         lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Semua"]],
-        order: [[1, 'asc']],
+        order: [[2, 'asc']],
         ajax: {
             url: "{{ route('bos.panduan.unrealized-data', [], false) }}",
             data: function(d) {
@@ -691,7 +824,6 @@ $(document).ready(function() {
         },
         columns: [
             {data: 'checkbox', orderable: false, searchable: false, className: 'text-center'},
-            {data: 'account_code', className: 'font-tabular'},
             {data: 'program_code', defaultContent: '-', className: 'font-tabular text-center'},
             {
                 data: 'description',
@@ -701,9 +833,9 @@ $(document).ready(function() {
                     if (row.total_planned_vol > 0) {
                         let plansText = (row.active_plans && row.active_plans.length > 0) ? row.active_plans.join(', ') : 'Rencana Belanja';
                         if (!row.is_allocatable) {
-                            text += '<span class="badge badge-warning text-dark ml-1" style="font-size: 0.70rem;" data-toggle="tooltip" data-bs-toggle="tooltip" title="Sudah masuk rencana belanja: ' + e(plansText) + '"><i class="fas fa-clipboard-check mr-1"></i>Sudah di Rencana (' + e(plansText) + ')</span>';
+                            text += '<div class="mt-1"><span class="badge badge-warning text-dark" style="font-size: 10px !important; font-weight: normal !important; padding: 1.5px 5px;" data-toggle="tooltip" data-bs-toggle="tooltip" title="Sudah masuk rencana belanja: ' + e(plansText) + '">Sudah di Rencana (' + e(plansText) + ')</span></div>';
                         } else {
-                            text += '<span class="badge badge-info ml-1" style="font-size: 0.70rem;" data-toggle="tooltip" data-bs-toggle="tooltip" title="Sebagian sudah masuk rencana: ' + e(plansText) + '"><i class="fas fa-clipboard-list mr-1"></i>' + row.total_planned_vol + ' ' + e(row.unit) + ' di ' + e(plansText) + '</span>';
+                            text += '<div class="mt-1"><span class="badge badge-info" style="font-size: 10px !important; font-weight: normal !important; padding: 1.5px 5px;" data-toggle="tooltip" data-bs-toggle="tooltip" title="Sebagian sudah masuk rencana: ' + e(plansText) + '">' + row.total_planned_vol + ' ' + e(row.unit) + ' di ' + e(plansText) + '</span></div>';
                         }
                     }
 
@@ -733,11 +865,6 @@ $(document).ready(function() {
                                 spekText +
                             '</div>';
                         });
-                    } else {
-                        text += '<div class="mt-1" style="font-size: 0.70rem;">' +
-                            '<span class="badge badge-light border text-secondary"><i class="fas fa-triangle-exclamation text-warning mr-1"></i>Belum Dipadukan</span>' +
-                            '<a href="{{ route("bos.pemaduan.index") }}" target="_blank" class="ml-1 text-primary font-weight-bold" title="Padukan dengan pengajuan riil">Padukan &rarr;</a>' +
-                        '</div>';
                     }
 
                     return text;
@@ -747,23 +874,24 @@ $(document).ready(function() {
                 data: 'remaining_volume',
                 className: 'font-tabular text-center',
                 render: function(data, type, row) {
+                    let unitHtml = row.unit ? ' <span class="text-muted small">' + e(row.unit) + '</span>' : '';
                     if (!row.is_allocatable) {
-                        return '<span class="badge badge-light border text-muted" title="Sisa yang belum masuk rencana: 0">0</span>';
+                        return '<span class="badge badge-light border text-muted" title="Sisa yang belum masuk rencana: 0">0</span>' + unitHtml;
                     }
-                    return '<span class="font-weight-bold">' + data + '</span>';
+                    return '<span class="font-weight-bold">' + data + '</span>' + unitHtml;
                 }
             },
-            {data: 'unit', className: 'text-center'},
-            {data: 'price_display', className: 'font-tabular text-right'},
-            {data: 'remaining_amount_display', className: 'font-tabular font-weight-bold text-info text-right'},
+            {data: 'price_display', className: 'font-tabular text-right text-end'},
+            {data: 'remaining_amount_display', className: 'font-tabular font-weight-bold text-info text-right text-end'},
             {data: 'months_included', className: 'text-center'},
             {
                 data: 'kegiatan',
                 searchable: false,
-                render: function(data) {
+                render: function(data, type, row) {
                     if (!data || data === '-') return '-';
                     let clean = e(data);
-                    return '<span class="d-inline-block text-truncate text-secondary" style="max-width: 280px; vertical-align: middle; cursor: help;" data-toggle="tooltip" data-bs-toggle="tooltip" data-placement="top" title="' + clean + '">' + clean + '</span>';
+                    let accountCodeHtml = row.account_code ? '<div class="font-tabular font-monospace text-muted mt-1" style="font-size: 0.72rem;"><i class="fas fa-barcode mr-1 text-secondary"></i>' + e(row.account_code) + '</div>' : '';
+                    return '<span class="d-inline-block text-truncate text-secondary" style="max-width: 260px; vertical-align: middle; cursor: help;" data-toggle="tooltip" data-bs-toggle="tooltip" data-placement="top" title="' + clean + '">' + clean + '</span>' + accountCodeHtml;
                 }
             }
         ],
@@ -794,14 +922,14 @@ $(document).ready(function() {
         columns: [
             {data: 'btn_expand', orderable: false, searchable: false, className: 'text-center cursor-pointer'},
             {data: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center'},
-            {data: 'no_nota_display', name: 'no_nota', className: 'text-center font-tabular font-weight-bold'},
+            {data: 'no_nota_display', name: 'no_nota', className: 'text-center font-tabular'},
             {data: 'title', name: 'title', className: 'font-weight-bold text-dark cursor-pointer'},
             {data: 'supplier_name', name: 'supplier_name', defaultContent: '-'},
             {data: 'planned_date_display', name: 'planned_date', className: 'font-tabular text-center'},
-            {data: 'items_count', name: 'items_count', orderable: false, searchable: false, className: 'text-center'},
-            {data: 'total_amount_display', name: 'total_amount', orderable: false, searchable: false, className: 'font-tabular font-weight-bold text-primary text-right'},
+            {data: 'items_count', name: 'items_count', orderable: false, searchable: false, className: 'text-center font-tabular'},
+            {data: 'total_amount_display', name: 'total_amount', orderable: false, searchable: false, className: 'font-tabular font-weight-bold text-dark text-right text-end'},
             {data: 'status_badge', name: 'status', orderable: false, className: 'text-center'},
-            {data: 'action', orderable: false, searchable: false, className: 'text-center'}
+            {data: 'action', orderable: false, searchable: false, className: 'text-center text-nowrap'}
         ],
         createdRow: function(row, data, dataIndex) {
             $(row).find('td:not(:last-child)').css('cursor', 'pointer');
@@ -1043,6 +1171,28 @@ $(document).ready(function() {
 
     $('#filter-hide-planned').on('change', function() {
         tableUnrealized.draw();
+    });
+
+    // Export Excel: Barang Belum Dibelanjakan (s/d Bulan ini, dikelompokkan per Program)
+    $('#btn-export-unrealized').on('click', function(e) {
+        e.preventDefault();
+        let year = $('#filter-year').val();
+        let month = $('#filter-month').val();
+        let hidePlanned = $('#filter-hide-planned').is(':checked') ? 1 : 0;
+        let url = "{{ route('bos.panduan.export-unrealized') }}?year=" + encodeURIComponent(year) +
+                  "&month=" + encodeURIComponent(month) +
+                  "&hide_planned=" + hidePlanned;
+        window.location.href = url;
+    });
+
+    // Export Excel: Rincian Daftar Rencana Belanja (Draft)
+    $('#btn-export-groups').on('click', function(e) {
+        e.preventDefault();
+        let year = $('#filter-year').val();
+        let status = $('#filter-group-status').val();
+        let url = "{{ route('bos.panduan.export-groups') }}?year=" + encodeURIComponent(year) +
+                  "&status=" + encodeURIComponent(status);
+        window.location.href = url;
     });
 
     // Checkbox Handling
@@ -1772,21 +1922,21 @@ $(document).ready(function() {
 
                 let statusBadge = '';
                 if (data.status === 'realized') {
-                    statusBadge = '<span class="badge badge-success font-weight-bold" style="font-size: 0.85rem; padding: 4px 8px; border-radius: 4px;"><i class="fas fa-check-circle mr-1"></i>Sudah Direalisasikan</span>';
+                    statusBadge = '<span class="badge badge-success font-weight-bold" style="font-size: 0.85rem; padding: 4px 8px; border-radius: 4px;">Realisasi</span>';
                     $('#detail-btn-toggle-order').addClass('d-none');
                 } else if (data.status === 'ordered') {
-                    statusBadge = '<span class="badge badge-primary font-weight-bold" style="font-size: 0.85rem; padding: 4px 8px; border-radius: 4px; background-color: #0284c7 !important; border: 1px solid #0369a1;"><i class="fas fa-cart-shopping mr-1"></i>Sudah Diorder</span>';
+                    statusBadge = '<span class="badge badge-primary font-weight-bold" style="font-size: 0.85rem; padding: 4px 8px; border-radius: 4px; background-color: #0284c7 !important; border: 1px solid #0369a1;">Order</span>';
                     $('#detail-btn-toggle-order').removeClass('d-none').removeClass('btn-outline-primary').addClass('btn-primary')
-                        .html('<i class="fas fa-check mr-1"></i> <span id="detail-btn-order-label">Sudah Diorder (Klik utk Batal)</span>')
+                        .html('<i class="fas fa-check mr-1"></i> <span id="detail-btn-order-label">Order (Klik utk Batal)</span>')
                         .attr('data-status', 'draft')
                         .attr('title', 'Klik untuk mengembalikan status ke Draft Rencana');
                 } else if (data.status === 'diajukan_ke_bank') {
-                    statusBadge = '<span class="badge badge-info font-weight-bold" style="font-size: 0.85rem; padding: 4px 8px; border-radius: 4px;"><i class="fas fa-file-invoice-dollar mr-1"></i>Diajukan ke TNT</span>';
+                    statusBadge = '<span class="badge badge-info font-weight-bold" style="font-size: 0.85rem; padding: 4px 8px; border-radius: 4px;">TNT</span>';
                     $('#detail-btn-toggle-order').addClass('d-none');
                 } else {
-                    statusBadge = '<span class="badge badge-warning text-dark font-weight-bold" style="font-size: 0.85rem; padding: 4px 8px; border-radius: 4px;"><i class="fas fa-clock mr-1"></i>Draft Rencana</span>';
+                    statusBadge = '<span class="badge badge-warning text-dark font-weight-bold" style="font-size: 0.85rem; padding: 4px 8px; border-radius: 4px;">Draft</span>';
                     $('#detail-btn-toggle-order').removeClass('d-none').removeClass('btn-primary').addClass('btn-outline-primary')
-                        .html('<i class="fas fa-cart-arrow-down mr-1"></i> <span id="detail-btn-order-label">Tandai Sudah Diorder</span>')
+                        .html('<i class="fas fa-cart-arrow-down mr-1"></i> <span id="detail-btn-order-label">Tandai Order</span>')
                         .attr('data-status', 'ordered')
                         .attr('title', 'Tandai bahwa rencana belanja ini sudah diorder');
                 }
@@ -1919,6 +2069,11 @@ $(document).ready(function() {
                             '<input type="text" inputmode="numeric" class="form-control form-control-sm input-price-edit input-thousand font-tabular" name="items[' + index + '][price]" value="' + formatThousand(item.price) + '" required>' +
                         '</td>' +
                         '<td class="cell-total-edit font-weight-bold font-tabular">Rp ' + formatRupiah(itemTotal) + '</td>' +
+                        '<td class="text-center align-middle">' +
+                            '<button type="button" class="btn btn-xs btn-outline-danger btn-delete-edit-item" title="Hapus barang ini dari rencana belanja">' +
+                                '<i class="fas fa-trash-alt"></i>' +
+                            '</button>' +
+                        '</td>' +
                     '</tr>';
 
                     tbody.append(rowHtml);
@@ -1929,6 +2084,54 @@ $(document).ready(function() {
             },
             error: function(xhr) {
                 Swal.fire('Gagal', xhr.responseJSON ? xhr.responseJSON.message : 'Gagal memuat data.', 'error');
+            }
+        });
+    });
+
+    // Helper: Recalculate Edit Grand Total
+    function recalculateEditGrandTotal() {
+        let grandTotal = 0;
+        $('#table-edit-preview tbody tr').each(function() {
+            let v = parseFloat($(this).find('.input-vol-edit').val()) || 0;
+            let p = parseThousand($(this).find('.input-price-edit').val());
+            grandTotal += (v * p);
+        });
+        $('#edit-modal-grand-total').text('Rp ' + formatRupiah(grandTotal));
+    }
+
+    // Delete item row from Edit Modal
+    $(document).on('click', '.btn-delete-edit-item', function() {
+        let tbody = $('#table-edit-preview tbody');
+        let totalRows = tbody.find('tr').length;
+        if (totalRows <= 1) {
+            Swal.fire('Perhatian', 'Rencana belanja harus memiliki minimal 1 barang. Jika ingin membatalkan seluruh rencana belanja, silakan hapus Rencana Belanja melalui tombol aksi di tabel utama.', 'warning');
+            return;
+        }
+
+        let row = $(this).closest('tr');
+        let itemName = row.find('td:first strong').text() || 'barang ini';
+
+        Swal.fire({
+            title: 'Hapus Barang?',
+            text: 'Keluarkan "' + itemName + '" dari rencana belanja ini?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: '<i class="fas fa-trash-alt mr-1"></i> Ya, Hapus',
+            cancelButtonText: 'Batal'
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                row.remove();
+                // Re-index remaining rows for consistent form array serialization
+                tbody.find('tr').each(function(idx) {
+                    $(this).find('input[name*="[id]"]').attr('name', 'items[' + idx + '][id]');
+                    $(this).find('input[name*="[nama_pasar]"]').attr('name', 'items[' + idx + '][nama_pasar]');
+                    $(this).find('input[name*="[spesifikasi]"]').attr('name', 'items[' + idx + '][spesifikasi]');
+                    $(this).find('input[name*="[volume_plan]"]').attr('name', 'items[' + idx + '][volume_plan]');
+                    $(this).find('input[name*="[price]"]').attr('name', 'items[' + idx + '][price]');
+                });
+                recalculateEditGrandTotal();
             }
         });
     });
@@ -1955,14 +2158,7 @@ $(document).ready(function() {
         let total = vol * price;
 
         row.find('.cell-total-edit').text('Rp ' + formatRupiah(total));
-
-        let grandTotal = 0;
-        $('#table-edit-preview tbody tr').each(function() {
-            let v = parseFloat($(this).find('.input-vol-edit').val()) || 0;
-            let p = parseThousand($(this).find('.input-price-edit').val());
-            grandTotal += (v * p);
-        });
-        $('#edit-modal-grand-total').text('Rp ' + formatRupiah(grandTotal));
+        recalculateEditGrandTotal();
     });
 
     // Update Group AJAX
@@ -2143,8 +2339,290 @@ $(document).ready(function() {
                         Swal.fire('Terhapus!', res.message, 'success');
                     },
                     error: function(xhr) {
-                        Swal.fire('Gagal Hapus', xhr.responseJSON ? xhr.responseJSON.message : 'Terjadi kesalahan saat menghapus.', 'error');
+                        Swal.fire('Gagal!', xhr.responseJSON ? xhr.responseJSON.message : 'Gagal menghapus.', 'error');
                     }
+                });
+            }
+        });
+    });
+
+    // ── INTEGRASI BAYAR UTILITAS KE RENCANA BELANJA ──
+    function loadUtilityModalData() {
+        const year = $('#filter-year').val() || '{{ $selectedYear }}';
+        const month = $('#util-filter-month').val() || $('#filter-month').val() || '{{ $currentMonthName }}';
+
+        $('#tbody-utilitas-bundling').html('<tr><td colspan="6" class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin mr-1"></i> Memuat data struk utilitas...</td></tr>');
+
+        $.ajax({
+            url: "{{ route('bos.panduan.utility-modal-data') }}",
+            type: 'GET',
+            data: { year: year, month: month },
+            success: function(res) {
+                $('#util-no-nota').val(res.no_nota);
+                $('#util-title').val(res.title || ('Bayar Utilitas dan BBM ' + res.month));
+
+                let guruHtml = '<option value="">-- Pilih Petugas Talangan --</option>';
+                (res.gurus || []).forEach(function(g) {
+                    const isSel = (res.default_guru_id && g.id == res.default_guru_id) ? 'selected' : '';
+                    guruHtml += `<option value="${g.id}" data-bank="${g.bank_name || ''}" data-account="${g.account_number || ''}" ${isSel}>${g.name}</option>`;
+                });
+                $('#util-guru-id').html(guruHtml);
+                $('#util-guru-id').trigger('change');
+
+                window.utilityReceiptsData = res.receipts || [];
+                window.utilityKkItemsData = res.kertas_kerja_items || [];
+
+                renderUtilityTable(res.receipts, res.kertas_kerja_items);
+            },
+            error: function(xhr) {
+                $('#tbody-utilitas-bundling').html('<tr><td colspan="6" class="text-center text-danger py-4"><i class="fas fa-exclamation-triangle mr-1"></i> Gagal memuat data tagihan utilitas.</td></tr>');
+            }
+        });
+    }
+
+    function renderUtilityTable(receipts, kkItems) {
+        if (!receipts || receipts.length === 0) {
+            $('#tbody-utilitas-bundling').html(`
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="fas fa-folder-open text-secondary fa-2x mb-2 d-block"></i>
+                        Tidak ada struk tagihan utilitas belum dibayar untuk bulan ini.<br>
+                        <small>Silakan scan / upload struk terlebih dahulu di modul <a href="{{ route('bos.utilitas.index') }}" target="_blank" class="font-weight-bold">Struk Utilitas</a>.</small>
+                    </td>
+                </tr>
+            `);
+            $('#check-all-util').prop('checked', false);
+            updateUtilityTotals();
+            return;
+        }
+
+        let rows = '';
+        receipts.forEach(function(r) {
+            let kkOptions = '<option value="">-- Pilih Komponen KK ARKAS --</option>';
+            kkItems.forEach(function(kk) {
+                const isSel = (r.suggested_kk_id && kk.id == r.suggested_kk_id) ? 'selected' : '';
+                kkOptions += `<option value="${kk.id}" data-price="${kk.price}" data-remaining="${kk.remaining_amount}" ${isSel}>${kk.label}</option>`;
+            });
+
+            const iconClass = r.category === 'internet' ? 'fa-wifi text-primary' : (r.category === 'telepon' ? 'fa-phone text-success' : 'fa-bolt text-warning');
+            const tokenBadge = r.token_number ? `<span class="badge badge-light border text-dark font-tabular mt-1 d-block" style="font-size: 0.7rem;"><i class="fas fa-key mr-1 text-warning"></i>${r.token_number}</span>` : '';
+            const receiptInfo = r.receipt_number ? `<small class="text-muted d-block font-tabular">${r.receipt_number}</small>` : '';
+
+            rows += `
+                <tr class="util-row" data-id="${r.id}">
+                    <td class="text-center">
+                        <input type="checkbox" class="util-checkbox" value="${r.id}" checked>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <i class="fas ${iconClass} mr-2 fa-lg"></i>
+                            <div>
+                                <strong class="text-dark d-block" style="font-size: 0.82rem;">${r.profile_name}</strong>
+                                <small class="text-muted d-block">Pel: ${r.customer_name} (${r.customer_number})</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <select class="form-select form-select-sm custom-select custom-select-sm util-kk-select font-weight-bold" style="font-size: 0.75rem; width: 100%;" required>
+                            ${kkOptions}
+                        </select>
+                        <div class="util-kk-warning small font-weight-bold text-danger mt-1 d-none">
+                            <i class="fas fa-exclamation-triangle mr-1"></i> Nominal melebihi sisa anggaran KK!
+                        </div>
+                    </td>
+                    <td class="text-right font-tabular font-weight-bold text-secondary">
+                        ${r.total_amount_display}
+                    </td>
+                    <td class="text-right">
+                        <input type="text" class="form-control form-control-sm text-right font-tabular font-weight-bold util-nominal-input" 
+                               value="${formatThousand(r.total_amount)}" style="height: 28px; font-size: 0.8125rem;">
+                    </td>
+                    <td class="text-center">
+                        ${tokenBadge}
+                        ${receiptInfo}
+                        <small class="text-muted font-tabular">${r.transaction_date}</small>
+                    </td>
+                </tr>
+            `;
+        });
+
+        $('#tbody-utilitas-bundling').html(rows);
+        $('#check-all-util').prop('checked', true);
+        updateUtilityTotals();
+    }
+
+    function updateUtilityTotals() {
+        let totalNominal = 0;
+        let count = 0;
+        let hasOverBudget = false;
+
+        $('#tbody-utilitas-bundling .util-row').each(function() {
+            const chk = $(this).find('.util-checkbox');
+            if (chk.is(':checked')) {
+                count++;
+                const nominalRaw = $(this).find('.util-nominal-input').val().replace(/\D/g, '') || 0;
+                const nominal = parseFloat(nominalRaw);
+                totalNominal += nominal;
+
+                const selectedKk = $(this).find('.util-kk-select option:selected');
+                const remaining = parseFloat(selectedKk.data('remaining') || 0);
+                const warn = $(this).find('.util-kk-warning');
+                if (selectedKk.val() && nominal > (remaining + 0.001)) {
+                    warn.removeClass('d-none');
+                    hasOverBudget = true;
+                } else {
+                    warn.addClass('d-none');
+                }
+            }
+        });
+
+        $('#util-selected-count').text(count);
+        $('#util-grand-total').text('Rp ' + formatThousand(totalNominal));
+
+        if (hasOverBudget) {
+            $('#util-budget-warning').removeClass('d-none');
+        } else {
+            $('#util-budget-warning').addClass('d-none');
+        }
+    }
+
+    $('#btn-bayar-utilitas').on('click', function() {
+        const currentM = $('#filter-month').val() || '{{ $currentMonthName }}';
+        $('#util-filter-month').val(currentM);
+        loadUtilityModalData();
+        $('#modalBayarUtilitas').modal('show');
+    });
+
+    $('#util-filter-month').on('change', function() {
+        loadUtilityModalData();
+    });
+
+    $('#util-guru-id').on('change', function() {
+        const selected = $(this).find('option:selected');
+        $('#util-bank-name').val(selected.data('bank') || 'Bank Jatim');
+        $('#util-account-number').val(selected.data('account') || '-');
+    });
+
+    $('#btn-refresh-util-no-nota').on('click', function() {
+        const year = $('#filter-year').val() || '{{ $selectedYear }}';
+        const month = $('#util-filter-month').val();
+        $.get("{{ route('bos.panduan.next-nota') }}", { year: year, month: month }, function(res) {
+            if (res.no_nota) {
+                $('#util-no-nota').val(res.no_nota);
+            }
+        });
+    });
+
+    $(document).on('change', '.util-checkbox', function() {
+        updateUtilityTotals();
+        const totalRows = $('#tbody-utilitas-bundling .util-checkbox').length;
+        const checkedRows = $('#tbody-utilitas-bundling .util-checkbox:checked').length;
+        $('#check-all-util').prop('checked', totalRows > 0 && totalRows === checkedRows);
+    });
+
+    $('#check-all-util').on('change', function() {
+        const isChecked = $(this).is(':checked');
+        $('#tbody-utilitas-bundling .util-checkbox').prop('checked', isChecked);
+        updateUtilityTotals();
+    });
+
+    $(document).on('input', '.util-nominal-input', function() {
+        let val = $(this).val();
+        $(this).val(formatThousand(val));
+        updateUtilityTotals();
+    });
+
+    $(document).on('change', '.util-kk-select', function() {
+        updateUtilityTotals();
+    });
+
+    $('#formBayarUtilitas').on('submit', function(e) {
+        e.preventDefault();
+
+        const selectedRows = $('#tbody-utilitas-bundling .util-row').filter(function() {
+            return $(this).find('.util-checkbox').is(':checked');
+        });
+
+        if (selectedRows.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Belum Ada Tagihan Dipilih',
+                text: 'Silakan centang minimal 1 tagihan utilitas untuk dibundel.',
+            });
+            return;
+        }
+
+        const receiptsPayload = [];
+        let missingKk = false;
+
+        selectedRows.each(function() {
+            const receiptId = $(this).data('id');
+            const kkId = $(this).find('.util-kk-select').val();
+            const nominal = parseFloat($(this).find('.util-nominal-input').val().replace(/\D/g, '') || 0);
+
+            if (!kkId) {
+                missingKk = true;
+            }
+
+            receiptsPayload.push({
+                id: receiptId,
+                bos_kertas_kerja_item_id: kkId,
+                nominal: nominal
+            });
+        });
+
+        if (missingKk) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Komponen Kertas Kerja Belum Dipilih',
+                text: 'Harap pastikan semua tagihan yang dicentang sudah memiliki pilihan Komponen Kertas Kerja ARKAS.',
+            });
+            return;
+        }
+
+        const payload = {
+            _token: '{{ csrf_token() }}',
+            year: $('#filter-year').val() || '{{ $selectedYear }}',
+            month: $('#util-filter-month').val(),
+            no_nota: $('#util-no-nota').val(),
+            title: $('#util-title').val(),
+            guru_id: $('#util-guru-id').val(),
+            bank_name: $('#util-bank-name').val(),
+            account_number: $('#util-account-number').val(),
+            planned_date: $('#util-planned-date').val(),
+            receipts: receiptsPayload
+        };
+
+        const btn = $('#btn-save-util-group');
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Menyimpan...');
+
+        $.ajax({
+            url: "{{ route('bos.panduan.store-utility-group') }}",
+            type: 'POST',
+            data: payload,
+            success: function(res) {
+                btn.prop('disabled', false).html('<i class="fas fa-check-circle mr-1"></i> Simpan Paket Rencana Belanja Utilitas');
+                $('#modalBayarUtilitas').modal('hide');
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil',
+                    text: res.message,
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+
+                tableUnrealized.draw();
+                tableGroups.draw();
+                $('#tab-groups-link').tab('show');
+            },
+            error: function(xhr) {
+                btn.prop('disabled', false).html('<i class="fas fa-check-circle mr-1"></i> Simpan Paket Rencana Belanja Utilitas');
+                const msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Terjadi kesalahan saat menyimpan paket belanja utilitas.';
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal Menyimpan',
+                    text: msg
                 });
             }
         });

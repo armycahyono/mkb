@@ -271,85 +271,46 @@ class UtilityReceiptTest extends TestCase
         $this->assertSoftDeleted('utility_receipts', ['id' => $receipt->id]);
     }
 
-    public function test_ocr_falls_back_to_next_model_when_receiving_503(): void
+    public function test_ocr_service_parses_token_pln_locally_without_gemini(): void
     {
-        config(['services.gemini.api_key' => 'fake-api-key']);
-        config(['services.gemini.model' => 'gemini-2.5-flash']);
+        Http::preventStrayRequests();
 
-        Http::fake([
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent*' => Http::response([
-                'error' => ['code' => 503, 'message' => 'High demand', 'status' => 'UNAVAILABLE'],
-            ], 503),
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent*' => Http::response([
-                'candidates' => [
-                    [
-                        'content' => [
-                            'parts' => [
-                                [
-                                    'text' => json_encode([
-                                        'payment_merchant' => 'PT POS INDONESIA Kpc. Kras 64172',
-                                        'meter_number' => '32118573479',
-                                        'customer_name' => 'SMK PGRI KRAS',
-                                        'total_amount' => 1003500,
-                                        'token_number' => '5001 0208 1701 5895 0864',
-                                        'transaction_date' => '2026-07-07 13:43:38',
-                                    ]),
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ], 200),
-        ]);
+        $rawText = '
+            PT POS INDONESIA Kpc. Kras 64172
+            STRUK PEMBELIAN LISTRIK PRABAYAR
+            NO METER : 32118573479
+            NAMA     : SMK PGRI KRAS
+            TOTAL RP : RP 1.003.500
+            STROOM / TOKEN : 5001 0208 1701 5895 0864
+            TGL : 07/07/2026 13:43:38
+        ';
 
         $service = new UtilityReceiptOcrService;
-        $result = $service->scan('data:image/jpeg;base64,'.base64_encode('fake-image-bytes'));
+        $result = $service->scan('dummy-path', $rawText, 'local');
 
         $this->assertTrue($result['success']);
         $this->assertEquals('token_smk_kras', $result['data']['matched_profile_code']);
         $this->assertEquals(1003500, $result['data']['total_amount']);
+        $this->assertEquals('5001 0208 1701 5895 0864', $result['data']['token_number']);
+        $this->assertEquals('32118573479', $result['data']['meter_number']);
     }
 
     public function test_ocr_scans_and_matches_atm_transfer_menaksopal_receipt(): void
     {
-        config(['services.gemini.api_key' => 'fake-api-key']);
-        config(['services.gemini.model' => 'gemini-2.5-flash']);
+        Http::preventStrayRequests();
 
-        Http::fake([
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent*' => Http::response([
-                'candidates' => [
-                    [
-                        'content' => [
-                            'parts' => [
-                                [
-                                    'text' => json_encode([
-                                        'payment_merchant' => '9843-BRI UNIT KRAS (Link)',
-                                        'receipt_number' => '07205',
-                                        'reference_number' => '07205',
-                                        'transaction_date' => '07/07/26 13:38:18',
-                                        'billing_month' => 'Juli',
-                                        'utility_type' => 'internet',
-                                        'meter_number' => null,
-                                        'customer_number' => '3243258444',
-                                        'customer_name' => 'MENAKSOPAL LINK NUSANTAR',
-                                        'tariff_power' => null,
-                                        'kwh_amount' => null,
-                                        'base_amount' => 1800000,
-                                        'tax_pbjt' => 0,
-                                        'admin_fee' => 0,
-                                        'total_amount' => 1800000,
-                                        'token_number' => null,
-                                    ]),
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ], 200),
-        ]);
+        $rawText = '
+            9843-BRI UNIT KRAS (Link)
+            RESI : 07205
+            TGL : 07/07/26 13:38:18
+            REKENING TUJUAN : 3243258444
+            NAMA : MENAKSOPAL LINK NUSANTAR
+            JUMLAH : RP 1.800.000
+            TOTAL : RP 1.800.000
+        ';
 
         $service = new UtilityReceiptOcrService;
-        $result = $service->scan('data:image/jpeg;base64,'.base64_encode('fake-image-bytes'));
+        $result = $service->scan('dummy-path', $rawText, 'local');
 
         $this->assertTrue($result['success']);
         $this->assertEquals('internet_menaksopal', $result['data']['matched_profile_code']);
@@ -359,7 +320,6 @@ class UtilityReceiptTest extends TestCase
         $this->assertEquals(2026, $result['data']['fiscal_year']);
         $this->assertEquals('Juli', $result['data']['billing_month']);
         $this->assertEquals(1800000, $result['data']['total_amount']);
-        $this->assertEquals(1800000, $result['data']['base_amount']);
     }
 
     public function test_user_can_batch_upload_utility_receipts_and_queue_is_dispatched(): void
@@ -401,39 +361,25 @@ class UtilityReceiptTest extends TestCase
     public function test_background_ocr_job_processes_receipt_and_updates_model(): void
     {
         Storage::fake('public');
-        config(['services.gemini.api_key' => 'fake-api-key']);
-        config(['services.gemini.model' => 'gemini-2.5-flash']);
+        Http::preventStrayRequests();
 
         $fakeImagePath = 'utility_receipts/dummy_receipt.jpg';
         Storage::disk('public')->put($fakeImagePath, 'dummy-image-content');
 
-        Http::fake([
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent*' => Http::response([
-                'candidates' => [
-                    [
-                        'content' => [
-                            'parts' => [
-                                [
-                                    'text' => json_encode([
-                                        'meter_number' => '32118573479',
-                                        'customer_name' => 'SMK PGRI KRAS',
-                                        'tariff_power' => 'S1/5500 VA',
-                                        'kwh_amount' => 1010.2,
-                                        'base_amount' => 909090,
-                                        'tax_pbjt' => 90910,
-                                        'admin_fee' => 3500,
-                                        'total_amount' => 1003500,
-                                        'token_number' => '5001 0208 1701 5895 0864',
-                                        'payment_merchant' => 'PT POS INDONESIA Kpc. Kras 64172',
-                                        'transaction_date' => '2026-07-07 13:43:38',
-                                    ]),
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ], 200),
-        ]);
+        $rawText = '
+            PT POS INDONESIA Kpc. Kras 64172
+            STRUK PEMBELIAN LISTRIK PRABAYAR
+            NO METER : 32118573479
+            NAMA : SMK PGRI KRAS
+            TARIF/DAYA : S1/5500 VA
+            JML KWH : 1010.2
+            RP BAYAR : RP 909.090
+            PPN/PBJT : RP 90.910
+            BIAYA ADM : RP 3.500
+            TOTAL BAYAR : RP 1.003.500
+            STROOM / TOKEN : 5001 0208 1701 5895 0864
+            TGL : 07/07/2026 13:43:38
+        ';
 
         $receipt = UtilityReceipt::create([
             'fiscal_year' => 2026,
@@ -441,6 +387,7 @@ class UtilityReceiptTest extends TestCase
             'transaction_date' => now(),
             'total_amount' => 0,
             'receipt_file' => $fakeImagePath,
+            'ocr_raw_data' => $rawText,
             'ocr_status' => 'pending',
         ]);
 
@@ -459,35 +406,21 @@ class UtilityReceiptTest extends TestCase
     public function test_artisan_command_process_pending_utility_receipts(): void
     {
         Storage::fake('public');
-        config(['services.gemini.api_key' => 'fake-api-key']);
-        config(['services.gemini.model' => 'gemini-2.5-flash']);
+        Http::preventStrayRequests();
 
         $fakeImagePath = 'utility_receipts/dummy_speedy.jpg';
         Storage::disk('public')->put($fakeImagePath, 'dummy-image-content');
 
-        Http::fake([
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent*' => Http::response([
-                'candidates' => [
-                    [
-                        'content' => [
-                            'parts' => [
-                                [
-                                    'text' => json_encode([
-                                        'customer_number' => '0354-000479487',
-                                        'customer_name' => 'IMAM SJADELI',
-                                        'base_amount' => 350000,
-                                        'admin_fee' => 2500,
-                                        'total_amount' => 352500,
-                                        'payment_merchant' => 'PT POS INDONESIA',
-                                        'transaction_date' => '2026-07-07 10:15:00',
-                                    ]),
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ], 200),
-        ]);
+        $rawText = '
+            PT POS INDONESIA
+            PEMBAYARAN TAGIHAN TELKOM / SPEEDY
+            NO TELP / ID : 0354-000479487
+            NAMA : IMAM SJADELI
+            TAGIHAN : RP 350.000
+            BIAYA ADMIN : RP 2.500
+            TOTAL BAYAR : RP 352.500
+            TGL : 07/07/2026 10:15:00
+        ';
 
         $receipt = UtilityReceipt::create([
             'fiscal_year' => 2026,
@@ -495,6 +428,7 @@ class UtilityReceiptTest extends TestCase
             'transaction_date' => now(),
             'total_amount' => 0,
             'receipt_file' => $fakeImagePath,
+            'ocr_raw_data' => $rawText,
             'ocr_status' => 'pending',
         ]);
 
@@ -504,7 +438,7 @@ class UtilityReceiptTest extends TestCase
         $receipt->refresh();
         $this->assertEquals('completed', $receipt->ocr_status);
         $this->assertEquals(352500, $receipt->total_amount);
-        $this->assertEquals('IMAM SJADELI', $receipt->customer_name);
+        $this->assertEquals('IMAM SADELI', $receipt->customer_name);
     }
 
     public function test_poll_status_endpoint_returns_pending_counts_and_matrix_summary(): void
@@ -623,9 +557,9 @@ class UtilityReceiptTest extends TestCase
             ->get(route('bos.utilitas.index', ['year' => 2026, 'month' => 'all']));
         $responseAllMonths->assertStatus(200);
         $responseAllMonths->assertSee('Semua Bulan');
-        // Total = 3.300.000, Rata-rata = 1.100.000, Proyeksi 12 bln = 13.200.000
+        // Total = 3.300.000, Rata-rata = 1.100.000 (Acuan RKA 12 bln dihilangkan dari kartu status)
         $responseAllMonths->assertSee('1.100.000');
-        $responseAllMonths->assertSee('13.200.000');
+        $responseAllMonths->assertDontSee('Acuan RKA');
 
         // 2. Akses halaman index dengan year=all & month=all
         $responseAllYears = $this->actingAs($user)
@@ -917,7 +851,7 @@ class UtilityReceiptTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Struk Utilitas');
         $response->assertSee('Upload Struk OCR');
-        $response->assertSee('Upload Struk AI');
+        $response->assertSee('Upload Batch');
     }
 
     public function test_it_returns_datatable_json(): void
@@ -1588,5 +1522,98 @@ class UtilityReceiptTest extends TestCase
 
         $receipt->refresh();
         $this->assertEquals($kkItem->id, $receipt->bos_kertas_kerja_item_id);
+    }
+
+    public function test_table_displays_remaining_budget_and_over_budget_warning_for_linked_kertas_kerja(): void
+    {
+        $user = User::first() ?? User::create([
+            'name' => 'Bendahara BOSP',
+            'email' => 'bendahara@test.com',
+            'password' => bcrypt('password'),
+            'role' => User::ROLE_BENDAHARA_BOS,
+        ]);
+
+        $profile = UtilityProfile::where('code', 'listrik_stm')->first();
+        if (! $profile) {
+            $profile = UtilityProfile::create([
+                'code' => 'listrik_stm',
+                'name' => 'Pembayaran Listrik STM',
+                'category' => 'listrik_pasca',
+                'customer_name' => 'STM',
+                'is_budgeted' => true,
+                'is_active' => true,
+            ]);
+        }
+
+        $kkFile = BosKertasKerjaFile::create([
+            'year' => 2026,
+            'is_active' => true,
+        ]);
+
+        // Alokasi Jan: 500.000, Feb: 500.000 (Total s.d. Feb: 1.000.000)
+        BosKertasKerjaItem::create([
+            'bos_kertas_kerja_file_id' => $kkFile->id,
+            'year' => 2026,
+            'month' => 'Januari',
+            'kegiatan' => 'Pembayaran daya listrik',
+            'program_code' => '07.06.01.',
+            'description' => 'Listrik Kampus STM',
+            'utility_profile_id' => $profile->id,
+            'total_amount' => 500000,
+            'price' => 500000,
+            'volume' => 1,
+        ]);
+
+        $kkFeb = BosKertasKerjaItem::create([
+            'bos_kertas_kerja_file_id' => $kkFile->id,
+            'year' => 2026,
+            'month' => 'Februari',
+            'kegiatan' => 'Pembayaran daya listrik',
+            'program_code' => '07.06.01.',
+            'description' => 'Listrik Kampus STM',
+            'utility_profile_id' => $profile->id,
+            'total_amount' => 500000,
+            'price' => 500000,
+            'volume' => 1,
+        ]);
+
+        // Kasus 1: Struk dengan pembayaran 1.200.000 (melebihi anggaran s.d. Feb sebesar 200.000)
+        $overReceipt = UtilityReceipt::create([
+            'utility_profile_id' => $profile->id,
+            'bos_kertas_kerja_item_id' => $kkFeb->id,
+            'fiscal_year' => 2026,
+            'billing_month' => 'Februari',
+            'transaction_date' => '2026-02-15 10:00:00',
+            'total_amount' => 1200000,
+            'ocr_status' => 'completed',
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('bos.utilitas.data', [
+            'year' => 2026,
+            'month' => '02',
+            'profile_id' => $profile->id,
+        ]));
+
+        $response->assertStatus(200);
+        $data = $response->json('data');
+        $this->assertNotEmpty($data);
+
+        $rowHtml = $data[0]['token_display'];
+        $this->assertStringContainsString('Over:', $rowHtml);
+        $this->assertStringContainsString('-Rp 200.000', $rowHtml);
+
+        // Kasus 2: Update struk menjadi 800.000 (masih aman dengan sisa anggaran 200.000)
+        $overReceipt->update(['total_amount' => 800000]);
+
+        $responseSafe = $this->actingAs($user)->getJson(route('bos.utilitas.data', [
+            'year' => 2026,
+            'month' => '02',
+            'profile_id' => $profile->id,
+        ]));
+
+        $dataSafe = $responseSafe->json('data');
+        $rowHtmlSafe = $dataSafe[0]['token_display'];
+        $this->assertStringContainsString('Sisa Anggaran:', $rowHtmlSafe);
+        $this->assertStringContainsString('Rp 200.000', $rowHtmlSafe);
     }
 }

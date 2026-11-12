@@ -7,13 +7,18 @@ use App\Imports\PerjadinImport;
 use App\Models\BosKertasKerjaItem;
 use App\Models\BosRealisasi;
 use App\Models\Guru;
+use App\Models\GuruBankAccount;
 use App\Models\GuruJabatan;
 use App\Models\Instansi;
 use App\Models\Perjadin;
 use App\Models\PerjadinItem;
 use App\Models\SchoolProfile;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use Yajra\DataTables\Facades\DataTables;
 
@@ -21,7 +26,8 @@ class PerjadinController extends Controller
 {
     private function resolveFundingSource(Request $request): string
     {
-        if ($request->routeIs('bpopp.*') || str_contains($request->path(), 'bpopp')) {
+        $path = $request->path();
+        if (str_starts_with($path, 'bpopp') || $request->is('bpopp*') || $request->input('funding_source') === 'BPOPP') {
             return 'BPOPP';
         }
 
@@ -63,6 +69,57 @@ class PerjadinController extends Controller
             ->toArray();
     }
 
+    private function getKertasKerjaItems(string $fundingSource, ?int $exceptPerjadinId = null): Collection
+    {
+        if ($fundingSource !== 'BOSP' || ! Schema::hasTable('bos_kertas_kerja_items')) {
+            return collect([]);
+        }
+
+        $monthOrder = DB::connection()->getDriverName() === 'sqlite'
+            ? "CASE month WHEN 'Januari' THEN 1 WHEN 'Februari' THEN 2 WHEN 'Maret' THEN 3 WHEN 'April' THEN 4 WHEN 'Mei' THEN 5 WHEN 'Juni' THEN 6 WHEN 'Juli' THEN 7 WHEN 'Agustus' THEN 8 WHEN 'September' THEN 9 WHEN 'Oktober' THEN 10 WHEN 'November' THEN 11 WHEN 'Desember' THEN 12 ELSE 13 END ASC"
+            : "FIELD(month, 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember') ASC";
+
+        $kertasKerjaItems = BosKertasKerjaItem::whereHas('file', function ($q) {
+            $q->where('is_active', true);
+        })
+            ->where(function ($q) {
+                $q->where('account_code', 'like', '5.1.02.04%')
+                    ->orWhere('description', 'like', '%perjalanan dinas%')
+                    ->orWhere('description', 'like', '%transport%')
+                    ->orWhere('kegiatan', 'like', '%perjalanan%');
+            })
+            ->with('realisasis')
+            ->orderBy('year', 'desc')
+            ->orderByRaw($monthOrder)
+            ->get();
+
+        if ($kertasKerjaItems->isNotEmpty()) {
+            $kkIds = $kertasKerjaItems->pluck('id');
+            $realizedVolumes = BosRealisasi::whereIn('bos_kertas_kerja_item_id', $kkIds)
+                ->select('bos_kertas_kerja_item_id', DB::raw('SUM(volume) as total_realized'))
+                ->groupBy('bos_kertas_kerja_item_id')
+                ->pluck('total_realized', 'bos_kertas_kerja_item_id');
+
+            $pendingQuery = PerjadinItem::whereHas('perjadin', function ($q) use ($kkIds, $exceptPerjadinId) {
+                $q->whereIn('bos_kertas_kerja_item_id', $kkIds)
+                    ->when($exceptPerjadinId, fn ($subQ) => $subQ->where('id', '!=', $exceptPerjadinId))
+                    ->whereDoesntHave('realisasi');
+            })
+                ->join('perjadins', 'perjadin_items.perjadin_id', '=', 'perjadins.id')
+                ->select('perjadins.bos_kertas_kerja_item_id', DB::raw('COUNT(perjadin_items.id) as total_pending'))
+                ->groupBy('perjadins.bos_kertas_kerja_item_id')
+                ->pluck('total_pending', 'perjadins.bos_kertas_kerja_item_id');
+
+            foreach ($kertasKerjaItems as $kk) {
+                $realized = (float) ($realizedVolumes[$kk->id] ?? 0);
+                $pending = (float) ($pendingQuery[$kk->id] ?? 0);
+                $kk->available_volume = max(0, (float) $kk->volume - ($realized + $pending));
+            }
+        }
+
+        return $kertasKerjaItems;
+    }
+
     public function index(Request $request)
     {
         $fundingSource = $this->resolveFundingSource($request);
@@ -77,7 +134,31 @@ class PerjadinController extends Controller
             ->unique();
         $availableYears = $perjadinYears->push((int) date('Y'))->unique()->sortDesc()->values();
 
-        if ($request->ajax()) {
+        // Ambil daftar tanggal pencairan unik untuk filter
+        $paymentDateQuery = Perjadin::where('funding_source', $fundingSource)
+            ->whereNotNull('payment_date');
+        if ($selectedYear !== 'all') {
+            $paymentDateQuery->where(function ($q) use ($selectedYear) {
+                $q->whereYear('payment_date', $selectedYear)
+                    ->orWhereYear('departure_date', $selectedYear);
+            });
+        }
+        $availablePaymentDates = $paymentDateQuery
+            ->select('payment_date', DB::raw('COUNT(*) as total_count'))
+            ->groupBy('payment_date')
+            ->orderByDesc('payment_date')
+            ->get()
+            ->map(function ($row) {
+                $carbon = Carbon::parse($row->payment_date);
+
+                return [
+                    'date' => $carbon->format('Y-m-d'),
+                    'formatted' => $carbon->translatedFormat('d F Y'),
+                    'count' => (int) $row->total_count,
+                ];
+            });
+
+        if ($request->ajax() || $request->wantsJson()) {
             if ($request->get('action') === 'counters') {
                 $baseCounterQuery = Perjadin::where('funding_source', $fundingSource);
                 if ($selectedYear !== 'all') {
@@ -86,6 +167,13 @@ class PerjadinController extends Controller
 
                 return response()->json([
                     'total' => (clone $baseCounterQuery)->count(),
+                    'draft' => (clone $baseCounterQuery)->where(function ($q) {
+                        $q->where('status', 'draft')->orWhereNull('status');
+                    })->whereNull('payment_date')->count(),
+                    'tnt' => (clone $baseCounterQuery)->where('status', 'diajukan_ke_bank')->count(),
+                    'cair' => (clone $baseCounterQuery)->where(function ($q) {
+                        $q->where('status', 'lunas')->orWhereNotNull('payment_date');
+                    })->count(),
                     'unassigned' => (clone $baseCounterQuery)->where(function ($q) {
                         $q->whereNull('bku_number')->orWhere('bku_number', '');
                     })->count(),
@@ -94,11 +182,29 @@ class PerjadinController extends Controller
             }
 
             $query = Perjadin::with(['items.guru', 'items.pencairanBankItem.pencairanBank', 'kepalaSekolah', 'bendahara'])
-                ->where('funding_source', $fundingSource)
-                ->orderBy('departure_date', 'desc');
+                ->where('funding_source', $fundingSource);
+
+            if (! $request->has('order')) {
+                $query->orderBy('departure_date', 'desc')->orderBy('id', 'desc');
+            }
 
             if ($selectedYear !== 'all') {
                 $query->whereYear('departure_date', $selectedYear);
+            }
+
+            if ($request->filled('status')) {
+                $statusFilter = $request->input('status');
+                if ($statusFilter === 'draft') {
+                    $query->where(function ($q) {
+                        $q->where('status', 'draft')->orWhereNull('status');
+                    })->whereNull('payment_date');
+                } elseif ($statusFilter === 'tnt' || $statusFilter === 'diajukan_ke_bank') {
+                    $query->where('status', 'diajukan_ke_bank');
+                } elseif ($statusFilter === 'cair' || $statusFilter === 'lunas') {
+                    $query->where(function ($q) {
+                        $q->where('status', 'lunas')->orWhereNotNull('payment_date');
+                    });
+                }
             }
 
             if ($request->filled('bku_status')) {
@@ -111,12 +217,39 @@ class PerjadinController extends Controller
                 }
             }
 
+            if ($request->filled('payment_date')) {
+                $pDate = $request->input('payment_date');
+                if ($pDate === 'draft') {
+                    $query->where(function ($q) {
+                        $q->where('status', 'draft')
+                            ->orWhereNull('status');
+                    })->whereNull('payment_date');
+                } elseif ($pDate === 'tnt' || $pDate === 'diajukan_ke_bank') {
+                    $query->where('status', 'diajukan_ke_bank');
+                } elseif ($pDate === 'unpaid') {
+                    $query->whereNull('payment_date');
+                } elseif ($pDate === 'paid' || $pDate === 'cair') {
+                    $query->where(function ($q) {
+                        $q->where('status', 'lunas')->orWhereNotNull('payment_date');
+                    });
+                } else {
+                    $query->whereDate('payment_date', $pDate);
+                }
+            }
+
             $baseCounterQuery = Perjadin::where('funding_source', $fundingSource);
             if ($selectedYear !== 'all') {
                 $baseCounterQuery->whereYear('departure_date', $selectedYear);
             }
             $counters = [
                 'total' => (clone $baseCounterQuery)->count(),
+                'draft' => (clone $baseCounterQuery)->where(function ($q) {
+                    $q->where('status', 'draft')->orWhereNull('status');
+                })->whereNull('payment_date')->count(),
+                'tnt' => (clone $baseCounterQuery)->where('status', 'diajukan_ke_bank')->count(),
+                'cair' => (clone $baseCounterQuery)->where(function ($q) {
+                    $q->where('status', 'lunas')->orWhereNotNull('payment_date');
+                })->count(),
                 'unassigned' => (clone $baseCounterQuery)->where(function ($q) {
                     $q->whereNull('bku_number')->orWhere('bku_number', '');
                 })->count(),
@@ -124,20 +257,125 @@ class PerjadinController extends Controller
             ];
 
             return DataTables::of($query)
-                ->filter(function ($q) use ($request) {
+                ->orderColumn('destination_name', function ($q, $order) {
+                    $q->orderBy('perjadins.destination_name', $order)->orderBy('perjadins.id', $order);
+                })
+                ->orderColumn('tujuan_display', function ($q, $order) {
+                    $q->orderBy('perjadins.destination_name', $order)->orderBy('perjadins.id', $order);
+                })
+                ->orderColumn('departure_date', function ($q, $order) {
+                    $q->orderBy('perjadins.departure_date', $order)->orderBy('perjadins.id', $order);
+                })
+                ->orderColumn('tanggal_display', function ($q, $order) {
+                    $q->orderBy('perjadins.departure_date', $order)->orderBy('perjadins.id', $order);
+                })
+                ->orderColumn('bku_number', function ($q, $order) {
+                    $q->orderBy('perjadins.id', $order);
+                })
+                ->orderColumn('bku_display', function ($q, $order) {
+                    $q->orderBy('perjadins.id', $order);
+                })
+                ->orderColumn('peserta', function ($q, $order) {
+                    $q->orderByRaw("(SELECT COUNT(*) FROM perjadin_items WHERE perjadin_items.perjadin_id = perjadins.id AND perjadin_items.deleted_at IS NULL) {$order}");
+                })
+                ->orderColumn('peserta_display', function ($q, $order) {
+                    $q->orderByRaw("(SELECT COUNT(*) FROM perjadin_items WHERE perjadin_items.perjadin_id = perjadins.id AND perjadin_items.deleted_at IS NULL) {$order}");
+                })
+                ->orderColumn('total_net_amount', function ($q, $order) {
+                    $q->orderByRaw("(SELECT COALESCE(SUM(net_amount), 0) FROM perjadin_items WHERE perjadin_items.perjadin_id = perjadins.id AND perjadin_items.deleted_at IS NULL) {$order}");
+                })
+                ->orderColumn('nominal_display', function ($q, $order) {
+                    $q->orderByRaw("(SELECT COALESCE(SUM(net_amount), 0) FROM perjadin_items WHERE perjadin_items.perjadin_id = perjadins.id AND perjadin_items.deleted_at IS NULL) {$order}");
+                })
+                ->orderColumn('status', function ($q, $order) {
+                    $q->orderByRaw("CASE perjadins.status WHEN 'lunas' THEN 3 WHEN 'diajukan_ke_bank' THEN 2 ELSE 1 END {$order}")->orderBy('perjadins.id', $order);
+                })
+                ->orderColumn('status_display', function ($q, $order) {
+                    $q->orderByRaw("CASE perjadins.status WHEN 'lunas' THEN 3 WHEN 'diajukan_ke_bank' THEN 2 ELSE 1 END {$order}")->orderBy('perjadins.id', $order);
+                })
+                ->filter(function ($q) use ($request, $fundingSource) {
                     if ($request->has('search') && ! empty($request->input('search')['value'])) {
-                        $search = $request->input('search')['value'];
-                        $q->where(function ($sub) use ($search) {
+                        $search = trim($request->input('search')['value']);
+                        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+                        $sppdSql = $isSqlite
+                            ? "('SPPD-' || substr('0000' || id, -4))"
+                            : "CONCAT('SPPD-', LPAD(id, 4, '0'))";
+
+                        $q->where(function ($sub) use ($search, $fundingSource, $sppdSql) {
                             $sub->where('destination_name', 'like', "%{$search}%")
                                 ->orWhere('activity_purpose', 'like', "%{$search}%")
-                                ->orWhere('bku_number', 'like', "%{$search}%")
+                                ->orWhere('letter_number', 'like', "%{$search}%")
                                 ->orWhere('account_code', 'like', "%{$search}%")
                                 ->orWhereHas('items.guru', function ($gq) use ($search) {
                                     $gq->where('name', 'like', "%{$search}%");
                                 })
                                 ->orWhereHas('items.pencairanBankItem.pencairanBank', function ($pq) use ($search) {
                                     $pq->where('letter_number', 'like', "%{$search}%");
+                                })
+                                ->orWhereHas('items', function ($iq) use ($search) {
+                                    $iq->where('receipt_number', 'like', "%{$search}%");
                                 });
+
+                            // ── 1. Pencarian Kode SPPD ───────────────────────
+                            $sub->orWhereRaw("{$sppdSql} LIKE ?", ["%{$search}%"]);
+
+                            $normHyphenSearch = str_replace(' ', '-', $search);
+                            if ($normHyphenSearch !== $search) {
+                                $sub->orWhereRaw("{$sppdSql} LIKE ?", ["%{$normHyphenSearch}%"]);
+                            }
+
+                            if (preg_match('/\d+/', $search, $numMatches)) {
+                                $extractedId = (int) $numMatches[0];
+                                if ($extractedId > 0) {
+                                    $sub->orWhere('id', $extractedId);
+                                }
+                            }
+
+                            // ── 2. Pencarian Nomor BKU ───────────────────────
+                            $sub->orWhere('bku_number', 'like', "%{$search}%");
+
+                            $cleanBkuSearch = preg_replace('/\s+/', '', $search);
+                            if ($cleanBkuSearch !== $search) {
+                                $sub->orWhere('bku_number', 'like', "%{$cleanBkuSearch}%");
+                            }
+
+                            // Pencocokan nomor di dalam rentang BKU (misal cari BPU072 pada BPU070 - BPU074)
+                            $searchPrefix = null;
+                            $searchNum = null;
+                            if (preg_match('/^([A-Za-z]+)\s*(\d+)$/', $search, $bkuMatch)) {
+                                $searchPrefix = strtoupper($bkuMatch[1]);
+                                $searchNum = (int) $bkuMatch[2];
+                            } elseif (is_numeric($search)) {
+                                $searchNum = (int) $search;
+                            }
+
+                            if ($searchNum !== null) {
+                                $rangeQuery = Perjadin::where('funding_source', $fundingSource)
+                                    ->where(function ($rq) {
+                                        $rq->where('bku_number', 'like', '%-%')
+                                            ->orWhere('bku_number', 'like', '%–%');
+                                    });
+
+                                if ($searchPrefix !== null) {
+                                    $rangeQuery->where('bku_number', 'like', "%{$searchPrefix}%");
+                                }
+
+                                $rangeCandidates = $rangeQuery->pluck('bku_number', 'id');
+                                $matchingRangeIds = [];
+                                foreach ($rangeCandidates as $candId => $candBku) {
+                                    if (preg_match('/^([A-Za-z\s]*?)(\d+)\s*[-–—]\s*(?:[A-Za-z\s]*?)(\d+)/', $candBku, $rMatches)) {
+                                        $start = (int) $rMatches[2];
+                                        $end = (int) $rMatches[3];
+                                        if ($searchNum >= $start && $searchNum <= $end) {
+                                            $matchingRangeIds[] = $candId;
+                                        }
+                                    }
+                                }
+
+                                if (! empty($matchingRangeIds)) {
+                                    $sub->orWhereIn('id', $matchingRangeIds);
+                                }
+                            }
                         });
                     }
                 })
@@ -149,45 +387,60 @@ class PerjadinController extends Controller
                 ->addColumn('tujuan_display', function ($row) {
                     $dest = '<div class="font-weight-bold text-dark">'.e($row->destination_name).'</div>';
                     $purpose = '<small class="text-muted d-block">'.e($row->activity_purpose).'</small>';
-                    $acc = $row->account_code ? '<span class="badge badge-light border font-tabular mt-1 mr-1">'.e($row->account_code).'</span>' : '';
 
-                    $tntBadges = '';
-                    if ($row->tnt_letters->isNotEmpty()) {
-                        foreach ($row->tnt_letters as $letter) {
-                            $tntBadges .= '<span class="badge badge-light border text-primary font-tabular font-weight-bold mt-1 mr-1" style="font-size: 0.78rem;" title="Nomor Surat Pencairan Bank (TNT)"><i class="fas fa-file-invoice-dollar mr-1 text-info"></i>Surat TNT: '.e($letter).'</span>';
-                        }
-                    }
+                    $shortSt = ! empty($row->letter_number) ? Str::limit($row->letter_number, 20, ' ...') : '';
+                    $stText = ! empty($row->letter_number)
+                        ? '<div class="text-muted font-tabular font-weight-normal mt-1 text-nowrap" style="font-size: 0.70rem;" title="Nomor Surat Tugas: '.e($row->letter_number).'"><i class="fas fa-file-alt mr-1 text-secondary"></i>No ST: '.e($shortSt).'</div>'
+                        : '';
 
-                    return $dest.$purpose.'<div class="d-flex flex-wrap align-items-center">'.$acc.$tntBadges.'</div>';
+                    return $dest.$purpose.$stText;
                 })
                 ->addColumn('tanggal_display', function ($row) {
                     $dep = $row->departure_date ? $row->departure_date->format('d/m/Y') : '-';
-                    $ret = $row->return_date ? ' s/d '.$row->return_date->format('d/m/Y') : '';
-                    $tgl = '<div class="font-tabular font-weight-500">'.$dep.$ret.'</div>';
-                    $pay = $row->payment_date ? '<small class="text-success d-block"><i class="fas fa-check-circle mr-1 me-1"></i>Bayar: '.$row->payment_date->format('d/m/Y').'</small>' : '<small class="text-warning d-block"><i class="fas fa-clock mr-1 me-1"></i>Belum Cair</small>';
+                    $isDifferent = $row->departure_date && $row->return_date && $row->departure_date->format('Y-m-d') !== $row->return_date->format('Y-m-d');
+                    $ret = $isDifferent ? ' - '.$row->return_date->format('d/m/Y') : '';
+                    $tgl = '<div class="font-tabular font-weight-500 text-nowrap" style="font-size: 0.75rem; letter-spacing: -0.2px;">'.$dep.$ret.'</div>';
+                    $pay = $row->payment_date ? '<small class="text-success d-block text-nowrap font-weight-normal" style="font-size: 0.70rem;"><i class="fas fa-check-circle mr-1 me-1"></i>Cair: '.$row->payment_date->format('d/m/Y').'</small>' : '<small class="text-warning d-block text-nowrap font-weight-normal" style="font-size: 0.70rem;"><i class="fas fa-clock mr-1 me-1"></i>Belum Cair</small>';
 
-                    return $tgl.$pay;
+                    $tntText = '';
+                    if ($row->tnt_letters->isNotEmpty()) {
+                        foreach ($row->tnt_letters as $letter) {
+                            $shortTnt = Str::limit($letter, 20, ' ...');
+                            $tntText .= '<div class="text-muted font-tabular font-weight-normal text-nowrap mt-1" style="font-size: 0.70rem;" title="Nomor Surat TNT: '.e($letter).'"><i class="fas fa-file-invoice-dollar mr-1 text-secondary"></i>No TNT: '.e($shortTnt).'</div>';
+                        }
+                    }
+
+                    return '<div class="text-nowrap" style="white-space: nowrap;">'.$tgl.$pay.$tntText.'</div>';
                 })
                 ->addColumn('bku_display', function ($row) {
+                    $sppdCode = 'SPPD-'.str_pad($row->id, 4, '0', STR_PAD_LEFT);
                     $teachersCount = $row->items->count();
                     $depYear = $row->departure_date ? $row->departure_date->format('Y') : date('Y');
 
+                    $sppdBadge = '<div class="text-muted font-tabular font-weight-normal mb-1" style="font-size: 0.68rem; letter-spacing: 0.2px;" title="Kode Identitas Realisasi">'.$sppdCode.'</div>';
+
                     if ($row->bku_number) {
-                        return '<div class="d-flex align-items-center justify-content-center gap-1 font-tabular">
-                            <span class="badge badge-light border font-weight-bold text-dark py-1 px-2" style="font-size: 0.76rem;">'.e($row->bku_number).'</span>
-                            <button type="button" class="btn btn-link btn-xs p-0 text-primary btn-edit-bku" data-id="'.$row->id.'" data-bku="'.e($row->bku_number).'" data-destination="'.e($row->destination_name).'" data-teachers="'.$teachersCount.'" data-year="'.$depYear.'" title="Ubah Nomor BKU">
-                                <i class="fas fa-edit"></i>
-                            </button>
+                        return '<div class="text-center font-tabular">
+                            '.$sppdBadge.'
+                            <div class="d-inline-flex align-items-center justify-content-center gap-1">
+                                <span class="badge badge-light border font-weight-bold text-dark py-1 px-2" style="font-size: 0.76rem;">'.e($row->bku_number).'</span>
+                                <button type="button" class="btn btn-link btn-xs p-0 text-primary btn-edit-bku" data-id="'.$row->id.'" data-bku="'.e($row->bku_number).'" data-destination="'.e($row->destination_name).'" data-teachers="'.$teachersCount.'" data-year="'.$depYear.'" title="Ubah Nomor BKU">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
                         </div>';
                     }
 
-                    return '<button type="button" class="btn btn-xs btn-outline-warning text-dark btn-edit-bku font-weight-bold px-2 py-0" data-id="'.$row->id.'" data-bku="" data-destination="'.e($row->destination_name).'" data-teachers="'.$teachersCount.'" data-year="'.$depYear.'" title="Isi Nomor BKU" style="font-size: 0.72rem; border-radius: 4px;">
-                        <i class="fas fa-plus mr-1 me-1 text-warning"></i>Isi BKU
-                    </button>';
+                    return '<div class="text-center font-tabular">
+                        '.$sppdBadge.'
+                        <button type="button" class="btn btn-xs btn-outline-warning text-dark btn-edit-bku font-weight-bold px-2 py-0" data-id="'.$row->id.'" data-bku="" data-destination="'.e($row->destination_name).'" data-teachers="'.$teachersCount.'" data-year="'.$depYear.'" title="Isi Nomor BKU" style="font-size: 0.72rem; border-radius: 4px;">
+                            <i class="fas fa-plus mr-1 me-1 text-warning"></i>Isi BKU
+                        </button>
+                    </div>';
                 })
                 ->addColumn('peserta_display', function ($row) {
                     $count = $row->items->count();
-                    $badges = '<div class="mb-1"><span class="badge badge-info font-tabular">'.$count.' Orang</span></div>';
+                    $badges = ($count > 1) ? '<div class="mb-1"><span class="badge badge-info font-tabular">'.$count.' Orang</span></div>' : '';
                     $names = $row->items->take(2)->map(function ($item) {
                         return '<small class="d-block text-truncate" style="max-width: 180px;">• '.e($item->guru->name ?? '-').'</small>';
                     })->implode('');
@@ -204,7 +457,7 @@ class PerjadinController extends Controller
                     if ($row->status === 'lunas') {
                         return '<span class="badge badge-success"><i class="fas fa-check-double mr-1 me-1"></i>Lunas</span>';
                     } elseif ($row->status === 'diajukan_ke_bank') {
-                        return '<span class="badge badge-info"><i class="fas fa-file-invoice-dollar mr-1 me-1"></i>Diajukan ke TNT</span>';
+                        return '<span class="badge badge-info"><i class="fas fa-file-invoice-dollar mr-1 me-1"></i>TNT</span>';
                     }
 
                     return '<span class="badge badge-warning"><i class="fas fa-hourglass-half mr-1 me-1"></i>Draft</span>';
@@ -226,12 +479,33 @@ class PerjadinController extends Controller
             $baseQuery->whereYear('departure_date', $selectedYear);
         }
         $totalCount = (clone $baseQuery)->count();
+        $draftCount = (clone $baseQuery)->where(function ($q) {
+            $q->where('status', 'draft')->orWhereNull('status');
+        })->whereNull('payment_date')->count();
+        $tntCount = (clone $baseQuery)->where('status', 'diajukan_ke_bank')->count();
+        $cairCount = (clone $baseQuery)->where(function ($q) {
+            $q->where('status', 'lunas')->orWhereNotNull('payment_date');
+        })->count();
         $unassignedBkuCount = (clone $baseQuery)->where(function ($q) {
             $q->whereNull('bku_number')->orWhere('bku_number', '');
         })->count();
         $assignedBkuCount = (clone $baseQuery)->whereNotNull('bku_number')->where('bku_number', '!=', '')->count();
+        $kertasKerjaItems = $this->getKertasKerjaItems($fundingSource);
 
-        return view('perjadin.index', compact('fundingSource', 'routePrefix', 'totalCount', 'unassignedBkuCount', 'assignedBkuCount', 'availableYears', 'selectedYear'));
+        return view('perjadin.index', compact(
+            'fundingSource',
+            'routePrefix',
+            'totalCount',
+            'draftCount',
+            'tntCount',
+            'cairCount',
+            'unassignedBkuCount',
+            'assignedBkuCount',
+            'availableYears',
+            'selectedYear',
+            'availablePaymentDates',
+            'kertasKerjaItems'
+        ));
     }
 
     public function updateBku(Request $request, Perjadin $perjadin)
@@ -356,46 +630,7 @@ class PerjadinController extends Controller
         $instansis = Instansi::orderBy('name')->get();
 
         $defaultAccountCode = $fundingSource === 'BOSP' ? '5.1.02.04.01.0003' : '5.1.02.04.01.0001';
-
-        $kertasKerjaItems = collect([]);
-        if ($fundingSource === 'BOSP') {
-            $kertasKerjaItems = BosKertasKerjaItem::whereHas('file', function ($q) {
-                $q->where('is_active', true);
-            })
-                ->where(function ($q) {
-                    $q->where('account_code', 'like', '5.1.02.04%')
-                        ->orWhere('description', 'like', '%perjalanan dinas%')
-                        ->orWhere('description', 'like', '%transport%')
-                        ->orWhere('kegiatan', 'like', '%perjalanan%');
-                })
-                ->with('realisasis')
-                ->orderBy('year', 'desc')
-                ->orderByRaw("FIELD(month, 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember') ASC")
-                ->get();
-
-            if ($kertasKerjaItems->isNotEmpty()) {
-                $kkIds = $kertasKerjaItems->pluck('id');
-                $realizedVolumes = BosRealisasi::whereIn('bos_kertas_kerja_item_id', $kkIds)
-                    ->select('bos_kertas_kerja_item_id', DB::raw('SUM(volume) as total_realized'))
-                    ->groupBy('bos_kertas_kerja_item_id')
-                    ->pluck('total_realized', 'bos_kertas_kerja_item_id');
-
-                $pendingQuery = PerjadinItem::whereHas('perjadin', function ($q) use ($kkIds) {
-                    $q->whereIn('bos_kertas_kerja_item_id', $kkIds)
-                        ->whereDoesntHave('realisasi');
-                })
-                    ->join('perjadins', 'perjadin_items.perjadin_id', '=', 'perjadins.id')
-                    ->select('perjadins.bos_kertas_kerja_item_id', DB::raw('COUNT(perjadin_items.id) as total_pending'))
-                    ->groupBy('perjadins.bos_kertas_kerja_item_id')
-                    ->pluck('total_pending', 'perjadins.bos_kertas_kerja_item_id');
-
-                foreach ($kertasKerjaItems as $kk) {
-                    $realized = (float) ($realizedVolumes[$kk->id] ?? 0);
-                    $pending = (float) ($pendingQuery[$kk->id] ?? 0);
-                    $kk->available_volume = max(0, (float) $kk->volume - ($realized + $pending));
-                }
-            }
-        }
+        $kertasKerjaItems = $this->getKertasKerjaItems($fundingSource);
 
         $availableYears = collect([(int) date('Y')]);
         if ($fundingSource === 'BOSP' && $kertasKerjaItems->isNotEmpty()) {
@@ -433,6 +668,7 @@ class PerjadinController extends Controller
             'return_date' => 'nullable|date|after_or_equal:departure_date',
             'payment_date' => 'nullable|date',
             'bku_number' => 'nullable|string|max:100',
+            'letter_number' => 'nullable|string|max:100',
             'account_code' => 'nullable|string|max:50',
             'city' => 'required|string|max:100',
             'kepala_sekolah_id' => 'required|exists:gurus,id',
@@ -491,6 +727,7 @@ class PerjadinController extends Controller
             'funding_source' => $fundingSource,
             'bos_kertas_kerja_item_id' => $validated['bos_kertas_kerja_item_id'] ?? null,
             'bku_number' => $validated['bku_number'] ?? null,
+            'letter_number' => $validated['letter_number'] ?? null,
             'account_code' => $validated['account_code'] ?? null,
             'activity_purpose' => $validated['activity_purpose'],
             'destination_name' => $validated['destination_name'],
@@ -552,47 +789,7 @@ class PerjadinController extends Controller
             ->get();
 
         $instansis = Instansi::orderBy('name')->get();
-
-        $kertasKerjaItems = collect([]);
-        if ($fundingSource === 'BOSP') {
-            $kertasKerjaItems = BosKertasKerjaItem::whereHas('file', function ($q) {
-                $q->where('is_active', true);
-            })
-                ->where(function ($q) {
-                    $q->where('account_code', 'like', '5.1.02.04%')
-                        ->orWhere('description', 'like', '%perjalanan dinas%')
-                        ->orWhere('description', 'like', '%transport%')
-                        ->orWhere('kegiatan', 'like', '%perjalanan%');
-                })
-                ->with('realisasis')
-                ->orderBy('year', 'desc')
-                ->orderByRaw("FIELD(month, 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember') ASC")
-                ->get();
-
-            if ($kertasKerjaItems->isNotEmpty()) {
-                $kkIds = $kertasKerjaItems->pluck('id');
-                $realizedVolumes = BosRealisasi::whereIn('bos_kertas_kerja_item_id', $kkIds)
-                    ->select('bos_kertas_kerja_item_id', DB::raw('SUM(volume) as total_realized'))
-                    ->groupBy('bos_kertas_kerja_item_id')
-                    ->pluck('total_realized', 'bos_kertas_kerja_item_id');
-
-                $pendingQuery = PerjadinItem::whereHas('perjadin', function ($q) use ($kkIds, $perjadin) {
-                    $q->whereIn('bos_kertas_kerja_item_id', $kkIds)
-                        ->where('id', '!=', $perjadin->id)
-                        ->whereDoesntHave('realisasi');
-                })
-                    ->join('perjadins', 'perjadin_items.perjadin_id', '=', 'perjadins.id')
-                    ->select('perjadins.bos_kertas_kerja_item_id', DB::raw('COUNT(perjadin_items.id) as total_pending'))
-                    ->groupBy('perjadins.bos_kertas_kerja_item_id')
-                    ->pluck('total_pending', 'perjadins.bos_kertas_kerja_item_id');
-
-                foreach ($kertasKerjaItems as $kk) {
-                    $realized = (float) ($realizedVolumes[$kk->id] ?? 0);
-                    $pending = (float) ($pendingQuery[$kk->id] ?? 0);
-                    $kk->available_volume = max(0, (float) $kk->volume - ($realized + $pending));
-                }
-            }
-        }
+        $kertasKerjaItems = $this->getKertasKerjaItems($fundingSource, $perjadin->id);
 
         $availableYears = collect([(int) date('Y')]);
         if ($fundingSource === 'BOSP' && $kertasKerjaItems->isNotEmpty()) {
@@ -631,12 +828,14 @@ class PerjadinController extends Controller
             'return_date' => 'nullable|date|after_or_equal:departure_date',
             'payment_date' => 'nullable|date',
             'bku_number' => 'nullable|string|max:100',
+            'letter_number' => 'nullable|string|max:100',
             'account_code' => 'nullable|string|max:50',
             'city' => 'required|string|max:100',
             'kepala_sekolah_id' => 'required|exists:gurus,id',
             'bendahara_id' => 'required|exists:gurus,id',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
+            'items.*.id' => 'nullable|integer',
             'items.*.guru_id' => 'required|exists:gurus,id',
             'items.*.amount' => 'required|numeric|min:0',
             'items.*.ppn' => 'nullable|numeric|min:0',
@@ -665,7 +864,21 @@ class PerjadinController extends Controller
             }
         }
 
-        $status = ! empty($validated['payment_date']) ? 'lunas' : $perjadin->status;
+        // Penanganan Status & Tanggal Pencairan Sesuai Prosedur:
+        // - Jika sedang diajukan ke bank (TNT), status TIDAK BOLEH berubah jadi lunas dari form edit.
+        //   Status lunas dan tanggal cair hanya diatur saat konfirmasi pencairan bank.
+        // - Jika sudah lunas, pertahankan status lunas dan tanggal cair yang ada.
+        // - Jika draft, baru dapat menjadi lunas jika ada pembayaran langsung / payment_date diisi.
+        if ($perjadin->status === 'diajukan_ke_bank') {
+            $status = 'diajukan_ke_bank';
+            $paymentDate = null;
+        } elseif ($perjadin->status === 'lunas') {
+            $status = 'lunas';
+            $paymentDate = ! empty($validated['payment_date']) ? $validated['payment_date'] : $perjadin->payment_date;
+        } else {
+            $status = ! empty($validated['payment_date']) ? 'lunas' : 'draft';
+            $paymentDate = $validated['payment_date'] ?? null;
+        }
 
         // Auto-resolve or auto-create Instansi
         $destName = trim($validated['destination_name']);
@@ -688,6 +901,7 @@ class PerjadinController extends Controller
         $perjadin->update([
             'bos_kertas_kerja_item_id' => $validated['bos_kertas_kerja_item_id'] ?? null,
             'bku_number' => $validated['bku_number'] ?? null,
+            'letter_number' => $validated['letter_number'] ?? null,
             'account_code' => $validated['account_code'] ?? null,
             'activity_purpose' => $validated['activity_purpose'],
             'destination_name' => $validated['destination_name'],
@@ -695,7 +909,7 @@ class PerjadinController extends Controller
             'instansi_id' => $instansi->id,
             'departure_date' => $validated['departure_date'],
             'return_date' => $validated['return_date'] ?? null,
-            'payment_date' => $validated['payment_date'] ?? null,
+            'payment_date' => $paymentDate,
             'city' => $validated['city'],
             'kepala_sekolah_id' => $validated['kepala_sekolah_id'],
             'bendahara_id' => $validated['bendahara_id'],
@@ -726,6 +940,19 @@ class PerjadinController extends Controller
                     'net_amount' => $itemData['net_amount'],
                     'is_paid' => $status === 'lunas',
                 ]);
+
+                // Sinkronkan ke Surat TNT jika item terhubung ke pencairan bank
+                if ($item->pencairan_bank_item_id && $item->pencairanBankItem) {
+                    $guru = Guru::find($itemData['guru_id']);
+                    $bankAcc = GuruBankAccount::find($bankAccId);
+                    $item->pencairanBankItem->update([
+                        'recipient_name' => $guru ? strtoupper($guru->name) : $item->pencairanBankItem->recipient_name,
+                        'bank_name' => $bankAcc ? $bankAcc->bank_name : $item->pencairanBankItem->bank_name,
+                        'account_number' => $bankAcc ? $bankAcc->account_number : $item->pencairanBankItem->account_number,
+                        'amount' => $itemData['net_amount'],
+                    ]);
+                }
+
                 $submittedItemIds[] = $itemId;
             } else {
                 $newItem = PerjadinItem::create([
@@ -745,6 +972,12 @@ class PerjadinController extends Controller
         // Delete removed items
         $toDelete = array_diff($existingItemIds, $submittedItemIds);
         if (! empty($toDelete)) {
+            $hasLinkedTnt = PerjadinItem::whereIn('id', $toDelete)->whereNotNull('pencairan_bank_item_id')->exists();
+            if ($hasLinkedTnt && $perjadin->status === 'diajukan_ke_bank') {
+                return back()->withInput()->withErrors([
+                    'items' => 'Peserta tidak dapat dihapus karena sudah terdaftar dalam Surat TNT Pencairan Bank. Harap sesuaikan atau batalkan Surat TNT terlebih dahulu di menu Pencairan Bank.',
+                ]);
+            }
             PerjadinItem::whereIn('id', $toDelete)->delete();
         }
 
@@ -780,6 +1013,41 @@ class PerjadinController extends Controller
         return view('perjadin.print_kwitansi', compact('perjadin', 'items', 'school', 'fundingSource', 'routePrefix'));
     }
 
+    public function printBatchKwitansi(Request $request)
+    {
+        $fundingSource = $this->resolveFundingSource($request);
+        $routePrefix = $this->getRoutePrefix($fundingSource);
+        $school = SchoolProfile::first();
+
+        $rawIds = $request->input('ids');
+        if (is_string($rawIds)) {
+            $ids = array_filter(array_map('trim', explode(',', $rawIds)));
+        } elseif (is_array($rawIds)) {
+            $ids = $rawIds;
+        } else {
+            $ids = [];
+        }
+
+        if (empty($ids)) {
+            return redirect()->route($routePrefix.'.perjadin.index')
+                ->with('error', 'Silakan pilih setidaknya satu kegiatan perjalanan dinas untuk dicetak.');
+        }
+
+        $perjadins = Perjadin::with(['kepalaSekolah', 'bendahara', 'items.guru', 'items.bankAccount'])
+            ->whereIn('id', $ids)
+            ->where('funding_source', $fundingSource)
+            ->orderBy('departure_date', 'asc')
+            ->orderBy('id', 'asc')
+            ->get();
+
+        if ($perjadins->isEmpty()) {
+            return redirect()->route($routePrefix.'.perjadin.index')
+                ->with('error', 'Data perjalanan dinas tidak ditemukan.');
+        }
+
+        return view('perjadin.print_kwitansi_batch', compact('perjadins', 'school', 'fundingSource', 'routePrefix'));
+    }
+
     /**
      * Download template Excel untuk import batch Perjadin
      */
@@ -796,15 +1064,17 @@ class PerjadinController extends Controller
      */
     public function import(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'excel_file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+            'bos_kertas_kerja_item_id' => 'nullable|exists:bos_kertas_kerja_items,id',
         ]);
 
         $fundingSource = $this->resolveFundingSource($request);
         $routePrefix = $this->getRoutePrefix($fundingSource);
+        $kkItemId = ! empty($validated['bos_kertas_kerja_item_id']) ? (int) $validated['bos_kertas_kerja_item_id'] : null;
 
         try {
-            $import = new PerjadinImport($fundingSource);
+            $import = new PerjadinImport($fundingSource, $kkItemId);
             Excel::import($import, $request->file('excel_file'));
 
             $results = $import->getResults();

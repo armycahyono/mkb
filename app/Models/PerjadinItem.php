@@ -27,10 +27,10 @@ class PerjadinItem extends Model
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
-        'ppn' => 'decimal:2',
-        'pph23' => 'decimal:2',
-        'net_amount' => 'decimal:2',
+        'amount' => 'float',
+        'ppn' => 'float',
+        'pph23' => 'float',
+        'net_amount' => 'float',
         'is_paid' => 'boolean',
     ];
 
@@ -56,6 +56,6 @@ class PerjadinItem extends Model
 
     public function getTerbilangAttribute(): string
     {
-        return TerbilangHelper::rupiah($this->net_amount);
+        return TerbilangHelper::rupiah($this->net_amount ?? 0);
     }
 }

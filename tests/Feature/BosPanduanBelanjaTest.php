@@ -499,7 +499,7 @@ class BosPanduanBelanjaTest extends TestCase
             ->get(route('bos.panduan.groups-data', ['year' => 2026, 'status' => 'ordered']));
 
         $groupsDataResponse->assertStatus(200);
-        $groupsDataResponse->assertSee('Sudah Diorder');
+        $groupsDataResponse->assertSee('Order');
         $groupsDataResponse->assertDontSee('Sudah Diorder (SIPLah)');
         $groupsDataResponse->assertSee('RB26-TEST-ORDER');
 
@@ -531,6 +531,191 @@ class BosPanduanBelanjaTest extends TestCase
         // Clean up
         $group->realisasis()->forceDelete();
         $group->items()->delete();
+        $group->delete();
+        $kk->delete();
+    }
+
+    public function test_update_group_removes_omitted_item(): void
+    {
+        $user = User::firstOrCreate(
+            ['id' => 1],
+            ['name' => 'Bendahara BOS', 'email' => 'bendahara@test.com']
+        );
+
+        $file = BosKertasKerjaFile::create([
+            'filename' => 'kertas_kerja_2026_mei.xlsx',
+            'is_active' => true,
+        ]);
+
+        $kk1 = BosKertasKerjaItem::create([
+            'bos_kertas_kerja_file_id' => $file->id,
+            'year' => 2026,
+            'month' => 'Mei',
+            'account_code' => '5.1.02.01.01.0024',
+            'program_code' => '03.01',
+            'kegiatan' => 'Kegiatan Administrasi Kantor',
+            'description' => 'Barang A',
+            'price' => 10000,
+            'volume' => 10,
+            'total_amount' => 100000,
+        ]);
+
+        $kk2 = BosKertasKerjaItem::create([
+            'bos_kertas_kerja_file_id' => $file->id,
+            'year' => 2026,
+            'month' => 'Mei',
+            'account_code' => '5.1.02.01.01.0024',
+            'program_code' => '03.01',
+            'kegiatan' => 'Kegiatan Administrasi Kantor',
+            'description' => 'Barang B',
+            'price' => 20000,
+            'volume' => 10,
+            'total_amount' => 200000,
+        ]);
+
+        $group = BosRencanaBelanja::create([
+            'year' => 2026,
+            'month' => 'Mei',
+            'no_nota' => 'RB26-TEST-DELETE-ITEM',
+            'title' => 'Rencana Belanja Uji Hapus Item',
+            'status' => 'draft',
+            'created_by' => 1,
+        ]);
+
+        $item1 = BosRencanaBelanjaItem::create([
+            'bos_rencana_belanja_id' => $group->id,
+            'bos_kertas_kerja_item_id' => $kk1->id,
+            'volume_plan' => 2,
+            'unit' => 'pcs',
+            'price' => 10000,
+            'total_amount' => 20000,
+        ]);
+
+        $item2 = BosRencanaBelanjaItem::create([
+            'bos_rencana_belanja_id' => $group->id,
+            'bos_kertas_kerja_item_id' => $kk2->id,
+            'volume_plan' => 3,
+            'unit' => 'pcs',
+            'price' => 20000,
+            'total_amount' => 60000,
+        ]);
+
+        $this->assertEquals(2, $group->items()->count());
+
+        // Update group by only keeping item1 (omitting item2)
+        $response = $this->actingAs($user)
+            ->put(route('bos.panduan.update-group', $group->id), [
+                'title' => 'Rencana Belanja Setelah Item Dihapus',
+                'items' => [
+                    [
+                        'id' => $item1->id,
+                        'volume_plan' => 2,
+                        'price' => 10000,
+                        'nama_pasar' => 'Barang A Revisi',
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonFragment(['message' => 'Rencana belanja berhasil diperbarui.']);
+
+        $group->refresh();
+        $this->assertEquals(1, $group->items()->count());
+        $this->assertTrue($group->items()->where('id', $item1->id)->exists());
+        $this->assertFalse($group->items()->where('id', $item2->id)->exists());
+
+        // Clean up
+        $group->items()->delete();
+        $group->delete();
+        $kk1->delete();
+        $kk2->delete();
+        $file->delete();
+    }
+
+    public function test_export_unrealized_excel(): void
+    {
+        $user = User::firstOrCreate(
+            ['id' => 1],
+            ['name' => 'Bendahara BOS', 'email' => 'bendahara@test.com']
+        );
+
+        $file = BosKertasKerjaFile::create([
+            'filename' => 'kertas_kerja_2026_export.xlsx',
+            'is_active' => true,
+        ]);
+
+        $kk = BosKertasKerjaItem::create([
+            'bos_kertas_kerja_file_id' => $file->id,
+            'year' => 2026,
+            'month' => 'Januari',
+            'account_code' => '5.1.02.01.01.0024',
+            'program_code' => '03.01',
+            'kegiatan' => 'Kegiatan Administrasi Kantor',
+            'description' => 'Barang Export Test',
+            'price' => 15000,
+            'volume' => 10,
+            'total_amount' => 150000,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('bos.panduan.export-unrealized', [
+                'year' => 2026,
+                'month' => 'Januari',
+                'hide_planned' => 1,
+            ]));
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString('filename=Barang_Belum_Belanja_2026_Januari.xlsx', (string) $response->headers->get('content-disposition'));
+
+        $kk->delete();
+        $file->delete();
+    }
+
+    public function test_export_groups_excel(): void
+    {
+        $user = User::firstOrCreate(
+            ['id' => 1],
+            ['name' => 'Bendahara BOS', 'email' => 'bendahara@test.com']
+        );
+
+        $group = BosRencanaBelanja::create([
+            'year' => 2026,
+            'month' => 'Januari',
+            'no_nota' => 'RB26-TEST-EXP',
+            'title' => 'Rencana Belanja Export Test',
+            'status' => 'draft',
+            'created_by' => 1,
+        ]);
+
+        $kk = BosKertasKerjaItem::create([
+            'year' => 2026,
+            'month' => 'Januari',
+            'account_code' => '5.1.02.01.01.0024',
+            'description' => 'Barang RB Export',
+            'price' => 20000,
+            'volume' => 5,
+            'total_amount' => 100000,
+        ]);
+
+        $item = BosRencanaBelanjaItem::create([
+            'bos_rencana_belanja_id' => $group->id,
+            'bos_kertas_kerja_item_id' => $kk->id,
+            'volume_plan' => 2,
+            'unit' => 'pcs',
+            'price' => 20000,
+            'total_amount' => 40000,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('bos.panduan.export-groups', [
+                'year' => 2026,
+                'status' => 'draft',
+            ]));
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString('filename=Daftar_Rencana_Belanja_2026_DRAFT.xlsx', (string) $response->headers->get('content-disposition'));
+
+        $item->delete();
         $group->delete();
         $kk->delete();
     }

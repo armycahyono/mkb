@@ -83,31 +83,31 @@ class BosKertasKerjaDataController extends Controller
                 })
                 ->addColumn('kegiatan_display', function ($row) {
                     $keg = e($row->kegiatan);
-                    if ($row->is_exhausted) {
-                        $lockIcon = ' <i class="fas fa-lock" style="color: #8a58dc;" data-toggle="tooltip" title="Terkunci: Alokasi anggaran bulan ini sudah terserap habis oleh Realisasi Belanja"></i>';
-                    } elseif ($row->is_locked) {
-                        $lockIcon = ' <i class="fas fa-lock text-warning" data-toggle="tooltip" title="Terkunci: Sudah dibelanjakan (masih ada sisa alokasi anggaran)"></i>';
-                    } else {
-                        $lockIcon = '';
-                    }
 
-                    return '<span class="d-inline-block text-truncate" style="max-width: 150px;" data-toggle="tooltip" data-placement="top" title="'.$keg.'">'.$keg.'</span>'.$lockIcon;
+                    return '<span class="d-inline-block text-truncate text-start" style="max-width: 140px; text-align: left;" data-toggle="tooltip" data-placement="top" title="'.$keg.'">'.$keg.'</span>';
                 })
                 ->addColumn('volume_display', function ($row) {
-                    return number_format($row->volume, 0, ',', '.');
+                    $vol = (float) $row->volume == (int) $row->volume
+                        ? number_format($row->volume, 0, ',', '.')
+                        : number_format($row->volume, 2, ',', '.');
+
+                    $unitHtml = $row->unit ? ' <span class="text-muted small">'.e($row->unit).'</span>' : '';
+
+                    return '<span class="font-tabular font-weight-bold">'.$vol.'</span>'.$unitHtml;
                 })
                 ->addColumn('price_display', function ($row) {
-                    return 'Rp '.number_format($row->price, 0, ',', '.');
+                    return number_format($row->price, 0, ',', '.');
                 })
                 ->addColumn('total_amount_display', function ($row) {
-                    return 'Rp '.number_format($row->total_amount, 0, ',', '.');
+                    return number_format($row->total_amount, 0, ',', '.');
                 })
                 ->addColumn('action', function ($row) {
                     if ($row->is_locked) {
                         $title = $row->is_exhausted
                             ? 'Terkunci: Alokasi Anggaran Bulan Ini Sudah Terserap Habis'
                             : 'Terkunci: Sudah Mulai Terealisasi (Tidak Dapat Diedit/Dihapus)';
-                        $btn = '<button class="btn btn-secondary btn-xs mr-1" disabled title="'.$title.'"><i class="fas fa-lock"></i></button>';
+                        $lockColor = $row->is_exhausted ? '#8a58dc' : '#f59e0b';
+                        $btn = '<span class="d-inline-flex align-items-center justify-content-center" style="color: '.$lockColor.'; font-size: 0.85rem;" data-bs-toggle="tooltip" data-toggle="tooltip" title="'.$title.'"><i class="fas fa-lock"></i></span>';
                     } else {
                         $editData = [
                             'id' => $row->id,
@@ -127,7 +127,7 @@ class BosKertasKerjaDataController extends Controller
                     return $btn;
                 })
                 ->with('grandTotal', 'Rp '.number_format($totalGrandFiltered, 0, ',', '.'))
-                ->rawColumns(['action', 'kegiatan_display'])
+                ->rawColumns(['action', 'kegiatan_display', 'volume_display'])
                 ->make(true);
         }
 

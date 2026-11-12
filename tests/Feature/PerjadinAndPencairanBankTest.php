@@ -242,6 +242,7 @@ class PerjadinAndPencairanBankTest extends TestCase
         $this->assertStringContainsString('SMPN 1 RINGINREJO', $html);
         $this->assertStringContainsString('ENDANG PATMOWATI', $html);
         $this->assertStringContainsString('ARMY WIDHI CAHYONO', $html);
+        $this->assertStringNotContainsString('page-footer-num', $html);
     }
 
     public function test_print_surat_kuasa_bank_renders_three_pages(): void
@@ -296,22 +297,62 @@ class PerjadinAndPencairanBankTest extends TestCase
 
         // Halaman 1: Pengantar
         $this->assertStringContainsString('Kuasa Pemindahbukuan', $html);
-        $this->assertStringContainsString('400.3.8.7/083.1/SMK PGRI Kras/2026', $html);
+        $this->assertStringContainsString('Nomor: 400.3.8.7/083.1/SMK PGRI Kras/2026', $html);
         $this->assertStringContainsString('1001003336', $html);
 
-        // Halaman 2: Surat Kuasa
+        // Halaman 2: Surat Kuasa (nomor memiliki tambahan .1 jika belum ada desimal)
         $this->assertStringContainsString('SURAT KUASA', $html);
         $this->assertStringContainsString('K H U S U S', $html);
+        $this->assertStringContainsString('No. 400.3.8.7/083.1/SMK PGRI Kras/2026', $html);
         $this->assertStringContainsString('MATERAI', $html);
         $this->assertStringContainsString('Dsn. Nglarangan, Rt 01/03, Ds. Selosari', $html);
         $this->assertStringContainsString('Rt. 03/04, Ds. Banjaranyar', $html);
 
-        // Halaman 3: Lampiran Rincian
+        // Halaman 3: Lampiran Rincian (nomor sama dengan halaman 2)
         $this->assertStringContainsString('DAFTAR SURAT PERINTAH PENCAIRAN DANA', $html);
+        $this->assertStringContainsString('YANG TIDAK TERPISAHKAN DARI SURAT KUASA', $html);
+        $this->assertStringContainsString('<div>400.3.8.7/083.1/SMK PGRI Kras/2026</div>', $html);
         $this->assertStringContainsString('PT. LADANG KARYA HUSADA', $html);
         $this->assertStringContainsString('VA. 1029700010171697', $html);
         $this->assertStringContainsString('6.000.000', $html);
         $this->assertStringContainsString('ALIYA NUSAIBA', $html);
+    }
+
+    public function test_pencairan_bank_letter_numbering_pages_increment_convention(): void
+    {
+        // Kasus 1: Nomor tanpa desimal (misal 80 -> hal 1: 80, hal 2 & 3: 80.1)
+        $p1 = new PencairanBank(['letter_number' => '400.3.8.7/80/smk pgri kras/2026']);
+        $this->assertEquals('400.3.8.7/80/smk pgri kras/2026', $p1->letter_number);
+        $this->assertEquals('400.3.8.7/80.1/smk pgri kras/2026', $p1->kuasa_letter_number);
+
+        // Kasus 2: Nomor tunggal angka 80
+        $p2 = new PencairanBank(['letter_number' => '80']);
+        $this->assertEquals('80', $p2->letter_number);
+        $this->assertEquals('80.1', $p2->kuasa_letter_number);
+
+        // Kasus 3: Nomor sudah berdesimal .1 (tetap mempertahankan formatnya)
+        $p3 = new PencairanBank(['letter_number' => '400.3.8.7/80.1/smk pgri kras/2026']);
+        $this->assertEquals('400.3.8.7/80.1/smk pgri kras/2026', $p3->letter_number);
+        $this->assertEquals('400.3.8.7/80.1/smk pgri kras/2026', $p3->kuasa_letter_number);
+
+        // View rendering assertion
+        $school = new SchoolProfile(['name' => 'SMK PGRI KRAS']);
+        $p1->id = 27;
+        $p1->total_accounts = 1;
+        $p1->total_nominal = 50000;
+        $p1->setRelation('items', collect([]));
+        $html = view('pencairan_bank.print_surat', [
+            'pencairanBank' => $p1,
+            'school' => $school,
+            'fundingSource' => 'BOSP',
+        ])->render();
+
+        // Halaman 1 memiliki nomor surat pengantar (80)
+        $this->assertStringContainsString('Nomor: 400.3.8.7/80/smk pgri kras/2026', $html);
+        // Halaman 2 memiliki nomor Surat Kuasa (+0.1 menjadi 80.1)
+        $this->assertStringContainsString('No. 400.3.8.7/80.1/smk pgri kras/2026', $html);
+        // Halaman 3 memiliki nomor Lampiran yang sama dengan Halaman 2 (80.1)
+        $this->assertStringContainsString('<div>400.3.8.7/80.1/smk pgri kras/2026</div>', $html);
     }
 
     public function test_pencairan_bank_excel_export_has_two_sheets(): void
@@ -359,12 +400,20 @@ class PerjadinAndPencairanBankTest extends TestCase
         $this->assertEquals('Referensi Instansi Terdaftar', $sheets[2]->title());
 
         $headings = $sheets[0]->headings();
-        $this->assertContains('Tanggal (YYYY-MM-DD)', $headings);
-        $this->assertContains('Tujuan Dinas', $headings);
-        $this->assertContains('Maksud Perjalanan', $headings);
-        $this->assertContains('Nama / NIP Guru', $headings);
-        $this->assertContains('Uang Diterima (Rp)', $headings);
-        $this->assertContains('No BKU Awal (Opsional)', $headings);
+        $this->assertEquals([
+            'No',
+            'Tanggal',
+            'No Surat',
+            'Tujuan Dinas',
+            'Alamat Tujuan (Opsional)',
+            'Maksud Perjalanan',
+            'Nama / NIP Guru',
+            'Uang Diterima (Rp)',
+            'No BKU Awal (Opsional)',
+            'PPN (Opsional)',
+            'PPh 21/23 (Opsional)',
+            'Catatan (Opsional)',
+        ], $headings);
 
         $instansiHeadings = $sheets[2]->headings();
         $this->assertContains('Nama Instansi / Sekolah / DUDI', $instansiHeadings);
@@ -392,6 +441,16 @@ class PerjadinAndPencairanBankTest extends TestCase
         $this->assertEquals(75000.0, PerjadinImport::cleanNumeric('Rp 75,000'));
         $this->assertEquals(65000.0, PerjadinImport::cleanNumeric('Rp 65.000,-'));
         $this->assertEquals(65000.0, PerjadinImport::cleanNumeric(65000));
+        $this->assertEquals(100000.0, PerjadinImport::cleanNumeric('=IFERROR(XLOOKUP(...), 100000)'));
+        $this->assertEquals(100000.0, PerjadinImport::cleanNumeric('="100.000"'));
+
+        // 4. Clean uncalculated Excel/Google Sheets formula strings
+        $formulaDestination = '=IFERROR(__xludf.DUMMYFUNCTION("XLOOKUP( A:A, IMPORTRANGE(""https://docs.google.com/spreadsheets/d/1kB2iVIXpUXdAg3epSf6J1bZ4XRzPiQ32Y2H1rzw_lMM/edit?gid=1146774691#gid=1146774691"",""\'3 Monitoring 2\'!A:A""), IMPORTRANGE(""https://docs.google.com/spreadsheets/d/1kB2iVIXpUXdAg3epSf6"&"J1bZ4XRzPiQ32Y2H1rzw_lMM/edit?gid=1146774691#gid=1146774691"",""\'3 Monitoring 2\'!B:B"") ) "),"Bengkel Mandala Auto")';
+        $this->assertEquals('Bengkel Mandala Auto', PerjadinImport::cleanFormulaOrText($formulaDestination));
+        $this->assertEquals('Bengkel Mandala Auto', PerjadinImport::cleanFormulaOrText("=IFERROR(XLOOKUP(A1, B:B, C:C), 'Bengkel Mandala Auto')"));
+        $this->assertEquals('SMK PGRI Kras', PerjadinImport::cleanFormulaOrText('="SMK PGRI Kras"'));
+        $this->assertEquals('100000', PerjadinImport::cleanFormulaOrText('=100000'));
+        $this->assertEquals('2026-10-14', PerjadinImport::parseExcelDate('=IFERROR(TODAY(), "2026-10-14")'));
     }
 
     public function test_perjadin_import_find_guru_and_grouping_logic(): void
@@ -979,6 +1038,26 @@ class PerjadinAndPencairanBankTest extends TestCase
             });
         }
 
+        if (! Schema::hasTable('school_profiles')) {
+            Schema::create('school_profiles', function (Blueprint $table) {
+                $table->id();
+                $table->string('name')->nullable();
+                $table->string('address')->nullable();
+                $table->string('bosp_bank_name')->nullable();
+                $table->string('bosp_bank_branch')->nullable();
+                $table->string('bosp_bank_address')->nullable();
+                $table->string('bosp_account_number')->nullable();
+                $table->string('bosp_account_name')->nullable();
+                $table->string('bpopp_bank_name')->nullable();
+                $table->string('bpopp_bank_branch')->nullable();
+                $table->string('bpopp_bank_address')->nullable();
+                $table->string('bpopp_account_number')->nullable();
+                $table->string('bpopp_account_name')->nullable();
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
+
         if (! Schema::hasTable('gurus')) {
             Schema::create('gurus', function (Blueprint $table) {
                 $table->id();
@@ -997,6 +1076,34 @@ class PerjadinAndPencairanBankTest extends TestCase
                 $table->string('account_number', 50);
                 $table->string('account_holder', 150);
                 $table->boolean('is_primary')->default(false);
+                $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('jabatans')) {
+            Schema::create('jabatans', function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 100);
+                $table->string('code', 50)->nullable();
+                $table->boolean('is_signatory')->default(false);
+                $table->text('description')->nullable();
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
+
+        if (! Schema::hasTable('guru_jabatans')) {
+            Schema::create('guru_jabatans', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('guru_id');
+                $table->unsignedBigInteger('jabatan_id');
+                $table->string('sk_number', 100)->nullable();
+                $table->date('sk_date')->nullable();
+                $table->string('period_year', 20)->default(date('Y'));
+                $table->date('start_date')->nullable();
+                $table->date('end_date')->nullable();
+                $table->boolean('is_active')->default(true);
+                $table->text('notes')->nullable();
                 $table->timestamps();
             });
         }
@@ -1039,6 +1146,7 @@ class PerjadinAndPencairanBankTest extends TestCase
                 $table->string('funding_source', 20)->default('BOSP');
                 $table->unsignedBigInteger('bos_kertas_kerja_item_id')->nullable();
                 $table->string('bku_number', 100)->nullable();
+                $table->string('letter_number', 100)->nullable();
                 $table->string('account_code', 50)->nullable();
                 $table->text('activity_purpose');
                 $table->string('destination_name', 255);
@@ -1115,11 +1223,26 @@ class PerjadinAndPencairanBankTest extends TestCase
             });
         }
 
+        if (! Schema::hasTable('utility_profiles')) {
+            Schema::create('utility_profiles', function (Blueprint $table) {
+                $table->id();
+                $table->string('code', 50)->nullable();
+                $table->string('name')->nullable();
+                $table->string('category', 50)->nullable();
+                $table->string('customer_name')->nullable();
+                $table->boolean('is_budgeted')->default(true);
+                $table->boolean('is_active')->default(true);
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
+
         if (! Schema::hasTable('utility_receipts')) {
             Schema::create('utility_receipts', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('utility_profile_id')->nullable();
                 $table->unsignedBigInteger('bos_kertas_kerja_item_id')->nullable();
+                $table->unsignedBigInteger('bos_rencana_belanja_id')->nullable();
                 $table->unsignedBigInteger('pencairan_bank_item_id')->nullable();
                 $table->integer('fiscal_year')->default(2026);
                 $table->string('billing_month', 50)->nullable();
@@ -1148,10 +1271,12 @@ class PerjadinAndPencairanBankTest extends TestCase
             Schema::create('bos_rencana_belanjas', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('supplier_id')->nullable();
+                $table->unsignedBigInteger('guru_id')->nullable();
                 $table->string('no_nota', 50)->nullable();
                 $table->integer('year')->nullable();
                 $table->string('month', 50)->nullable();
                 $table->string('title')->nullable();
+                $table->string('type', 30)->default('belanja');
                 $table->string('supplier_name')->nullable();
                 $table->date('planned_date')->nullable();
                 $table->string('status', 50)->default('draft');
@@ -1897,8 +2022,8 @@ class PerjadinAndPencairanBankTest extends TestCase
 
         $row = collect($data)->firstWhere('id', $perjadin->id);
         $this->assertNotNull($row);
-        $this->assertStringContainsString('400.3.8.7/999/SMK/2026', $row['tujuan_display']);
-        $this->assertStringContainsString('Diajukan ke TNT', $row['status_display']);
+        $this->assertStringContainsString('400.3.8.7/999/SMK/2026', $row['tanggal_display']);
+        $this->assertStringContainsString('TNT', $row['status_display']);
 
         // 3. Assert search by TNT number works
         $searchResponse = $this->actingAs($user)->getJson(route('bos.perjadin.index', [
@@ -2278,5 +2403,811 @@ class PerjadinAndPencairanBankTest extends TestCase
         // Pada item 101 karena merupakan item yang sedang aktif diedit, dia tetap terpilih
         $this->assertStringContainsString('value="101"', $editHtml);
         $this->assertStringContainsString('selected', $editHtml);
+    }
+
+    public function test_print_batch_kwitansi_renders_multiple_receipts(): void
+    {
+        $school = new SchoolProfile([
+            'name' => 'SMK PGRI KRAS',
+            'city' => 'Kediri',
+        ]);
+
+        $guru1 = new Guru(['name' => 'Budi Santoso', 'nip' => '19800101']);
+        $guru1->id = 1;
+        $guru2 = new Guru(['name' => 'Siti Aminah', 'nip' => '19850202']);
+        $guru2->id = 2;
+
+        $item1 = new PerjadinItem([
+            'perjadin_id' => 1,
+            'guru_id' => 1,
+            'amount' => 65000,
+            'ppn' => 0,
+            'pph23' => 0,
+            'net_amount' => 65000,
+        ]);
+        $item1->setRelation('guru', $guru1);
+        $item1->setRelation('bankAccount', null);
+
+        $perjadin1 = new Perjadin([
+            'funding_source' => 'BOSP',
+            'activity_purpose' => 'Rapat Koordinasi BOSP',
+            'destination_name' => 'Cabang Dinas Pendidikan',
+            'departure_date' => '2026-05-10',
+            'return_date' => '2026-05-10',
+            'bku_number' => 'BPU001 / 2026',
+            'letter_number' => '094/082/101.6.21/2026',
+            'city' => 'Kediri',
+        ]);
+        $perjadin1->id = 1;
+        $perjadin1->setRelation('items', collect([$item1]));
+        $perjadin1->setRelation('kepalaSekolah', null);
+        $perjadin1->setRelation('bendahara', null);
+
+        $item2 = new PerjadinItem([
+            'perjadin_id' => 2,
+            'guru_id' => 2,
+            'amount' => 100000,
+            'ppn' => 0,
+            'pph23' => 0,
+            'net_amount' => 100000,
+        ]);
+        $item2->setRelation('guru', $guru2);
+        $item2->setRelation('bankAccount', null);
+
+        $perjadin2 = new Perjadin([
+            'funding_source' => 'BOSP',
+            'activity_purpose' => 'Workshop Kurikulum Merdeka',
+            'destination_name' => 'Hotel Lotus Kediri',
+            'departure_date' => '2026-05-12',
+            'return_date' => '2026-05-12',
+            'bku_number' => 'BPU002 / 2026',
+            'letter_number' => '094/083/101.6.21/2026',
+            'city' => 'Kediri',
+        ]);
+        $perjadin2->id = 2;
+        $perjadin2->setRelation('items', collect([$item2]));
+        $perjadin2->setRelation('kepalaSekolah', null);
+        $perjadin2->setRelation('bendahara', null);
+
+        $perjadins = collect([$perjadin1, $perjadin2]);
+        $fundingSource = 'BOSP';
+        $routePrefix = 'bos';
+
+        $batchHtml = view('perjadin.print_kwitansi_batch', compact(
+            'perjadins',
+            'school',
+            'fundingSource',
+            'routePrefix'
+        ))->render();
+
+        $this->assertStringContainsString('Cetak Kwitansi Massal', $batchHtml);
+        $this->assertStringContainsString('Rapat Koordinasi BOSP', $batchHtml);
+        $this->assertStringContainsString('Workshop Kurikulum Merdeka', $batchHtml);
+        $this->assertStringContainsString('BUDI SANTOSO', $batchHtml);
+        $this->assertStringContainsString('SITI AMINAH', $batchHtml);
+        $this->assertStringContainsString('BPU001 / 2026', $batchHtml);
+        $this->assertStringContainsString('BPU002 / 2026', $batchHtml);
+        $this->assertStringContainsString('Nomor Surat', $batchHtml);
+        $this->assertStringContainsString('094/082/101.6.21/2026', $batchHtml);
+        $this->assertStringContainsString('094/083/101.6.21/2026', $batchHtml);
+    }
+
+    public function test_print_single_kwitansi_renders_letter_number(): void
+    {
+        $school = new SchoolProfile([
+            'name' => 'SMK PGRI KRAS',
+            'city' => 'Kediri',
+        ]);
+
+        $guru = new Guru(['name' => 'Budi Santoso', 'nip' => '19800101']);
+        $guru->id = 1;
+
+        $item = new PerjadinItem([
+            'perjadin_id' => 65,
+            'guru_id' => 1,
+            'amount' => 65000,
+            'ppn' => 0,
+            'pph23' => 0,
+            'net_amount' => 65000,
+        ]);
+        $item->setRelation('guru', $guru);
+        $item->setRelation('bankAccount', null);
+
+        $perjadin = new Perjadin([
+            'funding_source' => 'BOSP',
+            'activity_purpose' => 'Konsultasi Laporan BOSP',
+            'destination_name' => 'Cabang Dinas Pendidikan',
+            'departure_date' => '2026-05-10',
+            'return_date' => '2026-05-10',
+            'bku_number' => 'BPU001 / 2026',
+            'letter_number' => '094/065/101.6.21/2026',
+            'city' => 'Kediri',
+        ]);
+        $perjadin->id = 65;
+        $perjadin->setRelation('items', collect([$item]));
+        $perjadin->setRelation('kepalaSekolah', null);
+        $perjadin->setRelation('bendahara', null);
+
+        $items = collect([$item]);
+        $fundingSource = 'BOSP';
+        $routePrefix = 'bos';
+
+        $singleHtml = view('perjadin.print_kwitansi', compact(
+            'perjadin',
+            'items',
+            'school',
+            'fundingSource',
+            'routePrefix'
+        ))->render();
+
+        $this->assertStringContainsString('KWITANSI', $singleHtml);
+        $this->assertStringContainsString('Nomor Surat', $singleHtml);
+        $this->assertStringContainsString('094/065/101.6.21/2026', $singleHtml);
+        $this->assertStringContainsString('Konsultasi Laporan BOSP', $singleHtml);
+    }
+
+    public function test_perjadin_import_reads_no_surat_column(): void
+    {
+        $rows = collect([
+            [
+                'tanggal_yyyy_mm_dd' => '2026-05-03',
+                'no_surat_opsional' => '094/082/101.6.21/2026',
+                'tujuan_dinas' => 'SMPN 1 Ringinrejo',
+                'alamat_tujuan_opsional' => 'Jl. Marabunta',
+                'maksud_perjalanan' => 'Sosialisasi AN',
+                'nama_nip_guru' => 'Budi Santoso Import',
+                'uang_diterima_rp' => 65000,
+                'no_bku_awal_opsional' => 'BPU070',
+                'ppn_opsional' => 0,
+                'pph_2123_opsional' => 0,
+                'catatan_opsional' => '',
+            ],
+            [
+                'tanggal_yyyy_mm_dd' => '2026-05-03',
+                'no_surat_opsional' => '',
+                'tujuan_dinas' => 'SMPN 1 Ringinrejo',
+                'alamat_tujuan_opsional' => '',
+                'maksud_perjalanan' => 'Sosialisasi AN',
+                'nama_nip_guru' => 'Siti Aminah Import',
+                'uang_diterima_rp' => 65000,
+                'no_bku_awal_opsional' => '',
+                'ppn_opsional' => 0,
+                'pph_2123_opsional' => 0,
+                'catatan_opsional' => '',
+            ],
+        ]);
+
+        Guru::create(['name' => 'Budi Santoso Import', 'is_active' => true]);
+        Guru::create(['name' => 'Siti Aminah Import', 'is_active' => true]);
+
+        $import = new PerjadinImport('BOSP');
+        $import->collection($rows);
+
+        $perjadin = Perjadin::where('destination_name', 'SMPN 1 Ringinrejo')->first();
+        $this->assertNotNull($perjadin);
+        $this->assertEquals('094/082/101.6.21/2026', $perjadin->letter_number);
+        $this->assertEquals(2, $perjadin->items()->count());
+    }
+
+    public function test_perjadin_index_payment_date_filter(): void
+    {
+        $p1 = Perjadin::create([
+            'funding_source' => 'BOSP',
+            'activity_purpose' => 'Dinas 1',
+            'destination_name' => 'Tujuan 1',
+            'departure_date' => '2026-05-10',
+            'payment_date' => '2026-05-15',
+            'status' => 'lunas',
+            'city' => 'Kediri',
+        ]);
+
+        $p2 = Perjadin::create([
+            'funding_source' => 'BOSP',
+            'activity_purpose' => 'Dinas 2',
+            'destination_name' => 'Tujuan 2',
+            'departure_date' => '2026-06-10',
+            'payment_date' => '2026-06-20',
+            'status' => 'lunas',
+            'city' => 'Kediri',
+        ]);
+
+        $p3 = Perjadin::create([
+            'funding_source' => 'BOSP',
+            'activity_purpose' => 'Dinas 3',
+            'destination_name' => 'Tujuan 3',
+            'departure_date' => '2026-07-10',
+            'payment_date' => null,
+            'status' => 'draft',
+            'city' => 'Kediri',
+        ]);
+
+        $p4 = Perjadin::create([
+            'funding_source' => 'BOSP',
+            'activity_purpose' => 'Dinas 4',
+            'destination_name' => 'Tujuan 4',
+            'departure_date' => '2026-08-10',
+            'payment_date' => null,
+            'status' => 'diajukan_ke_bank',
+            'city' => 'Kediri',
+        ]);
+
+        $user = User::first() ?? User::create([
+            'name' => 'Test User',
+            'email' => 'testuser@example.com',
+            'password' => bcrypt('password'),
+        ]);
+
+        // 1. Filter by specific payment_date: 2026-05-15
+        $res1 = $this->actingAs($user)->getJson(route('bos.perjadin.index', ['payment_date' => '2026-05-15', 'year' => 'all']));
+        $res1->assertOk();
+        $data1 = $res1->json('data');
+        $this->assertCount(1, $data1);
+        $this->assertEquals('Tujuan 1', $data1[0]['destination_name']);
+
+        // 2. Filter by unpaid (all without payment date: draft & tnt)
+        $res2 = $this->actingAs($user)->getJson(route('bos.perjadin.index', ['payment_date' => 'unpaid', 'year' => 'all']));
+        $res2->assertOk();
+        $this->assertTrue(collect($res2->json('data'))->contains('destination_name', 'Tujuan 3'));
+        $this->assertTrue(collect($res2->json('data'))->contains('destination_name', 'Tujuan 4'));
+        $this->assertFalse(collect($res2->json('data'))->contains('destination_name', 'Tujuan 1'));
+
+        // 3. Filter by paid
+        $res3 = $this->actingAs($user)->getJson(route('bos.perjadin.index', ['payment_date' => 'paid', 'year' => 'all']));
+        $res3->assertOk();
+        $this->assertTrue(collect($res3->json('data'))->contains('destination_name', 'Tujuan 1'));
+        $this->assertTrue(collect($res3->json('data'))->contains('destination_name', 'Tujuan 2'));
+        $this->assertFalse(collect($res3->json('data'))->contains('destination_name', 'Tujuan 3'));
+        $this->assertFalse(collect($res3->json('data'))->contains('destination_name', 'Tujuan 4'));
+
+        // 4. Filter by draft
+        $resDraft = $this->actingAs($user)->getJson(route('bos.perjadin.index', ['payment_date' => 'draft', 'year' => 'all']));
+        $resDraft->assertOk();
+        $this->assertTrue(collect($resDraft->json('data'))->contains('destination_name', 'Tujuan 3'));
+        $this->assertFalse(collect($resDraft->json('data'))->contains('destination_name', 'Tujuan 4'));
+        $this->assertFalse(collect($resDraft->json('data'))->contains('destination_name', 'Tujuan 1'));
+
+        // 5. Filter by tnt
+        $resTnt = $this->actingAs($user)->getJson(route('bos.perjadin.index', ['payment_date' => 'tnt', 'year' => 'all']));
+        $resTnt->assertOk();
+        $this->assertTrue(collect($resTnt->json('data'))->contains('destination_name', 'Tujuan 4'));
+        $this->assertFalse(collect($resTnt->json('data'))->contains('destination_name', 'Tujuan 3'));
+        $this->assertFalse(collect($resTnt->json('data'))->contains('destination_name', 'Tujuan 1'));
+
+        // 6. Filter by status parameter (draft, tnt, cair)
+        $resStatusDraft = $this->actingAs($user)->getJson(route('bos.perjadin.index', ['status' => 'draft', 'year' => 'all']));
+        $resStatusDraft->assertOk();
+        $this->assertTrue(collect($resStatusDraft->json('data'))->contains('destination_name', 'Tujuan 3'));
+        $this->assertFalse(collect($resStatusDraft->json('data'))->contains('destination_name', 'Tujuan 4'));
+
+        $resStatusTnt = $this->actingAs($user)->getJson(route('bos.perjadin.index', ['status' => 'tnt', 'year' => 'all']));
+        $resStatusTnt->assertOk();
+        $this->assertTrue(collect($resStatusTnt->json('data'))->contains('destination_name', 'Tujuan 4'));
+        $this->assertFalse(collect($resStatusTnt->json('data'))->contains('destination_name', 'Tujuan 3'));
+
+        $resStatusCair = $this->actingAs($user)->getJson(route('bos.perjadin.index', ['status' => 'cair', 'year' => 'all']));
+        $resStatusCair->assertOk();
+        $this->assertTrue(collect($resStatusCair->json('data'))->contains('destination_name', 'Tujuan 1'));
+        $this->assertTrue(collect($resStatusCair->json('data'))->contains('destination_name', 'Tujuan 2'));
+        $this->assertFalse(collect($resStatusCair->json('data'))->contains('destination_name', 'Tujuan 3'));
+        $this->assertFalse(collect($resStatusCair->json('data'))->contains('destination_name', 'Tujuan 4'));
+
+        // 7. Check counters
+        $resCounters = $this->actingAs($user)->getJson(route('bos.perjadin.index', ['action' => 'counters', 'year' => 'all']));
+        $resCounters->assertOk();
+        $this->assertEquals(1, $resCounters->json('draft'));
+        $this->assertEquals(1, $resCounters->json('tnt'));
+        $this->assertEquals(2, $resCounters->json('cair'));
+    }
+
+    public function test_perjadin_item_amount_casts_and_edit_view(): void
+    {
+        $guru = Guru::create(['name' => 'Guru Test Amount', 'is_active' => true]);
+        $perjadin = Perjadin::create([
+            'funding_source' => 'BOSP',
+            'activity_purpose' => 'Test Edit Amount',
+            'destination_name' => 'SMKN 1 Kediri',
+            'departure_date' => '2026-05-10',
+            'city' => 'Kediri',
+            'kepala_sekolah_id' => $guru->id,
+            'bendahara_id' => $guru->id,
+        ]);
+
+        $item = PerjadinItem::create([
+            'perjadin_id' => $perjadin->id,
+            'guru_id' => $guru->id,
+            'amount' => 100000,
+            'ppn' => 0,
+            'pph23' => 0,
+            'net_amount' => 100000,
+        ]);
+
+        // Assert model cast returns float, not string '100000.00'
+        $this->assertIsFloat($item->fresh()->amount);
+        $this->assertEquals(100000.0, $item->fresh()->amount);
+
+        $user = User::first() ?? User::create([
+            'name' => 'Test User',
+            'email' => 'testuser@example.com',
+            'password' => bcrypt('password'),
+        ]);
+
+        $res = $this->actingAs($user)->get(route('bos.perjadin.edit', $perjadin->id));
+        $res->assertOk();
+        // In json serialization of items, amount should be 100000 (numeric)
+        $res->assertSee('"amount":100000', false);
+    }
+
+    public function test_perjadin_import_links_to_kertas_kerja_item(): void
+    {
+        $kkFile = BosKertasKerjaFile::create([
+            'fiscal_year' => 2026,
+            'filename' => 'kertas_kerja_test_import.xlsx',
+            'original_filename' => 'kertas_kerja_test_import.xlsx',
+            'file_path' => 'kertas_kerja/test.xlsx',
+            'is_active' => true,
+        ]);
+
+        $kkItem = BosKertasKerjaItem::create([
+            'bos_kertas_kerja_file_id' => $kkFile->id,
+            'year' => 2026,
+            'month' => 'Mei',
+            'account_code' => '5.1.02.04.01.0003',
+            'program_code' => '01',
+            'kegiatan' => 'Kegiatan Dinas Import',
+            'description' => 'Transport dinas import',
+            'volume' => 10,
+            'unit' => 'oh',
+            'price' => 75000,
+            'total_amount' => 750000,
+        ]);
+
+        Guru::create(['name' => 'Guru Import KK', 'is_active' => true]);
+
+        $rows = collect([
+            [
+                'tanggal_yyyy_mm_dd' => '2026-05-15',
+                'no_surat_opsional' => '094/KK/2026',
+                'tujuan_dinas' => 'Dinas Pendidikan Provinsi',
+                'alamat_tujuan_opsional' => 'Surabaya',
+                'maksud_perjalanan' => 'Koordinasi BOS',
+                'nama_nip_guru' => 'Guru Import KK',
+                'uang_diterima_rp' => '', // Kosong agar otomatis mengambil tarif KK
+                'no_bku_awal_opsional' => '',
+                'ppn_opsional' => 0,
+                'pph_2123_opsional' => 0,
+                'catatan_opsional' => '',
+            ],
+        ]);
+
+        $import = new PerjadinImport('BOSP', $kkItem->id);
+        $import->collection($rows);
+
+        $perjadin = Perjadin::where('destination_name', 'Dinas Pendidikan Provinsi')->first();
+        $this->assertNotNull($perjadin);
+        $this->assertEquals($kkItem->id, $perjadin->bos_kertas_kerja_item_id);
+        $this->assertEquals('5.1.02.04.01.0003', $perjadin->account_code);
+        $this->assertEquals(1, $perjadin->items()->count());
+        $this->assertEquals(75000.0, $perjadin->items()->first()->amount);
+    }
+
+    public function test_edit_perjadin_preserves_tnt_status_and_links(): void
+    {
+        $user = new User(['id' => 1, 'name' => 'Admin']);
+        $ks = Guru::create(['name' => 'Kepala Sekolah TNT', 'is_active' => true]);
+        $bendahara = Guru::create(['name' => 'Bendahara TNT', 'is_active' => true]);
+        $guru = Guru::create(['name' => 'Guru Peserta TNT', 'is_active' => true]);
+        $bankAcc = GuruBankAccount::create([
+            'guru_id' => $guru->id,
+            'bank_name' => 'Bank Jatim',
+            'account_number' => '1234567890',
+            'account_holder' => 'Guru Peserta TNT',
+            'is_primary' => true,
+        ]);
+
+        $perjadin = Perjadin::create([
+            'funding_source' => 'BOSP',
+            'activity_purpose' => 'Dinas Koordinasi',
+            'destination_name' => 'Kantor Cabdin',
+            'departure_date' => '2026-06-10',
+            'city' => 'Kediri',
+            'kepala_sekolah_id' => $ks->id,
+            'bendahara_id' => $bendahara->id,
+            'status' => 'draft',
+        ]);
+
+        $item = PerjadinItem::create([
+            'perjadin_id' => $perjadin->id,
+            'guru_id' => $guru->id,
+            'guru_bank_account_id' => $bankAcc->id,
+            'amount' => 100000,
+            'net_amount' => 100000,
+            'is_paid' => false,
+        ]);
+
+        $pencairanBank = PencairanBank::create([
+            'funding_source' => 'BOSP',
+            'letter_number' => 'TNT/2026/001',
+            'letter_date' => '2026-06-11',
+            'bank_name' => 'Bank Jatim',
+            'bank_branch' => 'Kediri',
+            'bank_address' => 'Jl. Brawijaya',
+            'source_account_number' => '00112233',
+            'source_account_name' => 'BOS SMK',
+            'kepala_sekolah_id' => $ks->id,
+            'bendahara_id' => $bendahara->id,
+            'status' => 'diajukan',
+        ]);
+
+        $bankItem = PencairanBankItem::create([
+            'pencairan_bank_id' => $pencairanBank->id,
+            'type' => 'perjadin',
+            'recipient_name' => 'GURU PESERTA TNT',
+            'bank_name' => 'Bank Jatim',
+            'account_number' => '1234567890',
+            'amount' => 100000,
+            'description' => 'Perjadin',
+        ]);
+
+        $item->update(['pencairan_bank_item_id' => $bankItem->id]);
+        $perjadin->update(['status' => 'diajukan_ke_bank']);
+
+        $this->assertEquals('diajukan_ke_bank', $perjadin->status);
+        $this->assertEquals(['TNT/2026/001'], $perjadin->tnt_letters->toArray());
+
+        // Simulasi submit form edit
+        $response = $this->actingAs($user)->put(route('bos.perjadin.update', $perjadin->id), [
+            'funding_source' => 'BOSP',
+            'activity_purpose' => 'Dinas Koordinasi Diperbarui',
+            'destination_name' => 'Kantor Cabdin Kediri',
+            'departure_date' => '2026-06-10',
+            'city' => 'Kediri',
+            'kepala_sekolah_id' => $ks->id,
+            'bendahara_id' => $bendahara->id,
+            'payment_date' => '2026-06-12', // Input tanggal bayar tidak boleh memaksa status lunas
+            'items' => [
+                [
+                    'id' => $item->id,
+                    'guru_id' => $guru->id,
+                    'guru_bank_account_id' => $bankAcc->id,
+                    'amount' => 120000,
+                    'net_amount' => 120000,
+                    'ppn' => 0,
+                    'pph23' => 0,
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('bos.perjadin.show', $perjadin->id));
+
+        $perjadin->refresh();
+        $this->assertEquals('diajukan_ke_bank', $perjadin->status, 'Status harus tetap diajukan_ke_bank saat masih dalam proses TNT');
+        $this->assertNull($perjadin->payment_date, 'payment_date harus tetap null sebelum TNT dicairkan bank');
+        $this->assertEquals(['TNT/2026/001'], $perjadin->tnt_letters->toArray(), 'Nomor TNT tidak boleh hilang');
+
+        $updatedItem = $perjadin->items()->first();
+        $this->assertEquals($bankItem->id, $updatedItem->pencairan_bank_item_id, 'Relasi ke TNT item harus tetap terjaga');
+        $this->assertEquals(120000.0, (float) $bankItem->fresh()->amount, 'Nominal di TNT item harus tersinkron');
+    }
+
+    public function test_import_perjadin_links_to_selected_kertas_kerja_item(): void
+    {
+        $kkFile = BosKertasKerjaFile::create([
+            'filename' => '2026_kk.pdf',
+            'year' => 2026,
+            'is_active' => true,
+        ]);
+
+        $kkItem = BosKertasKerjaItem::create([
+            'bos_kertas_kerja_file_id' => $kkFile->id,
+            'year' => 2026,
+            'month' => 'Januari',
+            'account_code' => '5.1.02.04.01.0003',
+            'program_code' => '01',
+            'kegiatan' => 'Kegiatan Januari',
+            'description' => 'Uang Transport Perjalanan dinas Januari',
+            'volume' => 50,
+            'unit' => 'oh',
+            'price' => 65000,
+            'total_amount' => 3250000,
+        ]);
+
+        $g = Guru::create(['name' => 'Guru Test KK Selection', 'is_active' => true]);
+
+        $rows = collect([
+            [
+                'tanggal_yyyy_mm_dd' => '2026-01-20',
+                'no_surat_opsional' => '094/01/2026',
+                'tujuan_dinas' => 'Dinas Pendidikan Kediri',
+                'maksud_perjalanan' => 'Koordinasi PMB',
+                'nama_nip_guru' => 'Guru Test KK Selection',
+                'uang_diterima_rp' => '', // kosong, harus otomatis ambil tarif KK (65.000)
+            ],
+        ]);
+
+        $import = new PerjadinImport('BOSP', $kkItem->id);
+        $import->collection($rows);
+
+        $perjadin = Perjadin::where('destination_name', 'Dinas Pendidikan Kediri')->first();
+        $this->assertNotNull($perjadin);
+        $this->assertEquals($kkItem->id, $perjadin->bos_kertas_kerja_item_id);
+        $this->assertEquals('5.1.02.04.01.0003', $perjadin->account_code);
+        $this->assertEquals(65000.0, (float) $perjadin->items()->first()->amount);
+    }
+
+    public function test_pencairan_bank_create_page_has_default_letter_number_matching_active_year(): void
+    {
+        $user = User::create([
+            'name' => 'Admin Test',
+            'email' => 'admin_test@mkb.test',
+            'password' => bcrypt('password'),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->withSession(['fiscal_year' => 2026])
+            ->get(route('bos.pencairan-bank.create'));
+
+        $response->assertOk();
+        $response->assertSee('400.3.8.7/_____/SMK PGRI Kras/2026');
+    }
+
+    public function test_perjadin_datatable_does_not_show_badge_if_only_one_participant(): void
+    {
+        $user = User::create([
+            'name' => 'Admin Test 2',
+            'email' => 'admin_test2@mkb.test',
+            'password' => bcrypt('password'),
+        ]);
+
+        $guru1 = Guru::create(['name' => 'Peserta Tunggal', 'is_active' => true]);
+        $guru2 = Guru::create(['name' => 'Peserta Kedua', 'is_active' => true]);
+
+        // Perjadin dengan 1 peserta
+        $singlePerjadin = Perjadin::create([
+            'funding_source' => 'BOSP',
+            'destination_name' => 'Tujuan Dinas Tunggal',
+            'activity_purpose' => 'Kegiatan Tunggal',
+            'departure_date' => '2026-03-01',
+            'return_date' => '2026-03-01',
+            'status' => 'draft',
+        ]);
+        PerjadinItem::create([
+            'perjadin_id' => $singlePerjadin->id,
+            'guru_id' => $guru1->id,
+            'amount' => 100000,
+            'net_amount' => 100000,
+        ]);
+
+        // Perjadin dengan 2 peserta
+        $multiPerjadin = Perjadin::create([
+            'funding_source' => 'BOSP',
+            'destination_name' => 'Tujuan Dinas Bersama',
+            'activity_purpose' => 'Kegiatan Bersama',
+            'departure_date' => '2026-03-02',
+            'return_date' => '2026-03-02',
+            'status' => 'draft',
+        ]);
+        PerjadinItem::create([
+            'perjadin_id' => $multiPerjadin->id,
+            'guru_id' => $guru1->id,
+            'amount' => 100000,
+            'net_amount' => 100000,
+        ]);
+        PerjadinItem::create([
+            'perjadin_id' => $multiPerjadin->id,
+            'guru_id' => $guru2->id,
+            'amount' => 100000,
+            'net_amount' => 100000,
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('bos.perjadin.index', ['year' => 'all']), [
+            'X-Requested-With' => 'XMLHttpRequest',
+        ]);
+        $response->assertOk();
+
+        $data = collect($response->json('data'));
+
+        $singleRow = $data->firstWhere('id', $singlePerjadin->id);
+        $this->assertNotNull($singleRow);
+        $this->assertStringNotContainsString('1 Orang', $singleRow['peserta_display']);
+        $this->assertStringContainsString('Peserta Tunggal', $singleRow['peserta_display']);
+
+        $multiRow = $data->firstWhere('id', $multiPerjadin->id);
+        $this->assertNotNull($multiRow);
+        $this->assertStringContainsString('2 Orang', $multiRow['peserta_display']);
+        $this->assertStringContainsString('Peserta Tunggal', $multiRow['peserta_display']);
+        $this->assertStringContainsString('Peserta Kedua', $multiRow['peserta_display']);
+    }
+
+    public function test_search_perjadin_by_sppd_and_bku_number(): void
+    {
+        $this->ensureDatabaseTables();
+
+        $user = User::first() ?? User::factory()->create();
+
+        $perjadin = Perjadin::create([
+            'funding_source' => 'BOSP',
+            'destination_name' => 'Dinas Pendidikan Wilayah Kediri',
+            'activity_purpose' => 'Koordinasi Kurikulum',
+            'departure_date' => '2026-05-10',
+            'return_date' => '2026-05-10',
+            'bku_number' => 'BPU070 - BPU074 / 2026',
+            'status' => 'draft',
+        ]);
+
+        $sppdCode = 'SPPD-'.str_pad($perjadin->id, 4, '0', STR_PAD_LEFT);
+
+        // 1. Cari berdasarkan kode SPPD lengkap (misal SPPD-0001)
+        $respSppd = $this->actingAs($user)->getJson(route('bos.perjadin.index', [
+            'year' => 'all',
+            'search' => ['value' => $sppdCode],
+        ]), ['X-Requested-With' => 'XMLHttpRequest']);
+        $respSppd->assertOk();
+        $this->assertTrue(collect($respSppd->json('data'))->contains('id', $perjadin->id));
+
+        // 2. Cari berdasarkan keyword 'SPPD'
+        $respWord = $this->actingAs($user)->getJson(route('bos.perjadin.index', [
+            'year' => 'all',
+            'search' => ['value' => 'sppd'],
+        ]), ['X-Requested-With' => 'XMLHttpRequest']);
+        $respWord->assertOk();
+        $this->assertTrue(collect($respWord->json('data'))->contains('id', $perjadin->id));
+
+        // 3. Cari nomor di tengah rentang BKU (BPU072)
+        $respBkuMid = $this->actingAs($user)->getJson(route('bos.perjadin.index', [
+            'year' => 'all',
+            'search' => ['value' => 'BPU072'],
+        ]), ['X-Requested-With' => 'XMLHttpRequest']);
+        $respBkuMid->assertOk();
+        $this->assertTrue(collect($respBkuMid->json('data'))->contains('id', $perjadin->id));
+
+        // 4. Cari nomor BKU dengan spasi: 'BPU 070'
+        $respBkuSpace = $this->actingAs($user)->getJson(route('bos.perjadin.index', [
+            'year' => 'all',
+            'search' => ['value' => 'BPU 070'],
+        ]), ['X-Requested-With' => 'XMLHttpRequest']);
+        $respBkuSpace->assertOk();
+        $this->assertTrue(collect($respBkuSpace->json('data'))->contains('id', $perjadin->id));
+    }
+
+    public function test_perjadin_datatable_sorting(): void
+    {
+        $this->ensureDatabaseTables();
+
+        $user = User::first() ?? User::factory()->create();
+
+        $perjadin1 = Perjadin::create([
+            'funding_source' => 'BOSP',
+            'destination_name' => 'Lokasi A (Lama)',
+            'activity_purpose' => 'Kegiatan Dinas Lama',
+            'departure_date' => '2026-01-10',
+            'return_date' => '2026-01-10',
+            'status' => 'draft',
+        ]);
+        PerjadinItem::create([
+            'perjadin_id' => $perjadin1->id,
+            'amount' => 500000,
+            'net_amount' => 500000,
+        ]);
+
+        $perjadin2 = Perjadin::create([
+            'funding_source' => 'BOSP',
+            'destination_name' => 'Lokasi B (Baru)',
+            'activity_purpose' => 'Kegiatan Dinas Baru',
+            'departure_date' => '2026-09-20',
+            'return_date' => '2026-09-20',
+            'status' => 'lunas',
+        ]);
+        PerjadinItem::create([
+            'perjadin_id' => $perjadin2->id,
+            'amount' => 100000,
+            'net_amount' => 100000,
+        ]);
+        PerjadinItem::create([
+            'perjadin_id' => $perjadin2->id,
+            'amount' => 150000,
+            'net_amount' => 150000,
+        ]);
+
+        // 1. Default sorting (departure_date desc): perjadin2 harus di atas perjadin1
+        $respDefault = $this->actingAs($user)->getJson(route('bos.perjadin.index', [
+            'year' => 'all',
+        ]), ['X-Requested-With' => 'XMLHttpRequest']);
+        $respDefault->assertOk();
+        $dataDefault = collect($respDefault->json('data'));
+        $idx1 = $dataDefault->search(fn ($item) => $item['id'] === $perjadin1->id);
+        $idx2 = $dataDefault->search(fn ($item) => $item['id'] === $perjadin2->id);
+        $this->assertNotFalse($idx1);
+        $this->assertNotFalse($idx2);
+        $this->assertLessThan($idx1, $idx2, 'Perjadin dengan tanggal terbaru (perjadin2) harus berada di atas perjadin lama (perjadin1)');
+
+        // 2. Sorting total_net_amount desc: perjadin1 (500k) harus di atas perjadin2 (250k)
+        $respNominal = $this->actingAs($user)->getJson(route('bos.perjadin.index', [
+            'year' => 'all',
+            'columns' => [
+                ['data' => 'nominal_display', 'name' => 'total_net_amount'],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'desc'],
+            ],
+        ]), ['X-Requested-With' => 'XMLHttpRequest']);
+        $respNominal->assertOk();
+        $dataNominal = collect($respNominal->json('data'));
+        $nIdx1 = $dataNominal->search(fn ($item) => $item['id'] === $perjadin1->id);
+        $nIdx2 = $dataNominal->search(fn ($item) => $item['id'] === $perjadin2->id);
+        $this->assertLessThan($nIdx2, $nIdx1, 'Sorting total_net_amount desc harus menempatkan nominal lebih besar di atas');
+
+        // 3. Sorting peserta desc: perjadin2 (2 orang) harus di atas perjadin1 (1 orang)
+        $respPeserta = $this->actingAs($user)->getJson(route('bos.perjadin.index', [
+            'year' => 'all',
+            'columns' => [
+                ['data' => 'peserta_display', 'name' => 'peserta'],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'desc'],
+            ],
+        ]), ['X-Requested-With' => 'XMLHttpRequest']);
+        $respPeserta->assertOk();
+        $dataPeserta = collect($respPeserta->json('data'));
+        $pIdx1 = $dataPeserta->search(fn ($item) => $item['id'] === $perjadin1->id);
+        $pIdx2 = $dataPeserta->search(fn ($item) => $item['id'] === $perjadin2->id);
+        $this->assertLessThan($pIdx1, $pIdx2, 'Sorting peserta desc harus menempatkan jumlah peserta lebih banyak di atas');
+
+        // 4. Sorting SPPD / BKU (id desc)
+        $respBku = $this->actingAs($user)->getJson(route('bos.perjadin.index', [
+            'year' => 'all',
+            'columns' => [
+                ['data' => 'bku_display', 'name' => 'bku_number'],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'desc'],
+            ],
+        ]), ['X-Requested-With' => 'XMLHttpRequest']);
+        $respBku->assertOk();
+
+        // 5. Sorting Status
+        $respStatus = $this->actingAs($user)->getJson(route('bos.perjadin.index', [
+            'year' => 'all',
+            'columns' => [
+                ['data' => 'status_display', 'name' => 'status'],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'desc'],
+            ],
+        ]), ['X-Requested-With' => 'XMLHttpRequest']);
+        $respStatus->assertOk();
+    }
+
+    public function test_perjadin_import_handles_external_lookup_formulas_in_destination_column(): void
+    {
+        $guru = Guru::create([
+            'name' => 'Guru Testing Formula',
+            'is_active' => true,
+        ]);
+
+        $formulaDestination = '=IFERROR(__xludf.DUMMYFUNCTION("XLOOKUP( A:A, IMPORTRANGE(""https://docs.google.com/spreadsheets/d/1kB2iVIXpUXdAg3epSf6J1bZ4XRzPiQ32Y2H1rzw_lMM/edit?gid=1146774691#gid=1146774691"",""\'3 Monitoring 2\'!A:A""), IMPORTRANGE(""https://docs.google.com/spreadsheets/d/1kB2iVIXpUXdAg3epSf6"&"J1bZ4XRzPiQ32Y2H1rzw_lMM/edit?gid=1146774691#gid=1146774691"",""\'3 Monitoring 2\'!B:B"") ) "),"Bengkel Mandala Auto")';
+
+        $rows = collect([
+            [
+                'tanggal_yyyy_mm_dd' => '2026-10-14',
+                'no_surat_opsional' => '800.1.11.1/200/SMK PGRI Kras/2026',
+                'tujuan_dinas' => $formulaDestination,
+                'alamat_tujuan_opsional' => 'Ds. Kanigoro, Kec. Kras, Kab. Kediri',
+                'maksud_perjalanan' => 'Monitoring PKL',
+                'nama_nip_guru' => 'Guru Testing Formula',
+                'uang_diterima_rp' => '100.000',
+                'no_bku_awal_opsional' => 'BPU001',
+                'catatan_opsional' => 'Diimpor dari file Excel',
+            ],
+        ]);
+
+        $import = new PerjadinImport('BOSP');
+        $import->collection($rows);
+
+        $this->assertEmpty($import->getResults()['warnings']);
+        $perjadin = Perjadin::where('destination_name', 'Bengkel Mandala Auto')->first();
+        $this->assertNotNull($perjadin);
+        $this->assertEquals('2026-10-14', $perjadin->departure_date->format('Y-m-d'));
+        $this->assertEquals('Monitoring PKL', $perjadin->activity_purpose);
+        $this->assertEquals('800.1.11.1/200/SMK PGRI Kras/2026', $perjadin->letter_number);
     }
 }

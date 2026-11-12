@@ -23,12 +23,12 @@
     </div>
     <div class="header-actions d-flex align-items-center flex-wrap" style="gap: 8px;">
         <!-- Filter Form Tahun & Bulan -->
-        <form action="{{ route('bos.utilitas.index') }}" method="GET" class="d-flex align-items-center" style="gap: 6px;">
+        <form id="form-filter-period" action="{{ route('bos.utilitas.index') }}" method="GET" class="d-flex align-items-center" style="gap: 6px;">
             <div class="input-group input-group-sm" style="width: auto;">
                 <span class="input-group-text bg-light text-muted py-0 px-2 font-weight-bold" style="font-size: 0.75rem;">
                     <i class="far fa-calendar-alt text-primary mr-1"></i> Tahun:
                 </span>
-                <select name="year" class="form-control form-control-sm font-weight-bold" onchange="this.form.submit()" style="font-size: 0.75rem; height: 30px;">
+                <select name="year" id="filter-year-select" class="form-control form-control-sm font-weight-bold" style="font-size: 0.75rem; height: 30px;">
                     <option value="all" {{ $isAllYears ? 'selected' : '' }}>Semua Tahun</option>
                     @foreach($availableYears as $yr)
                         <option value="{{ $yr }}" {{ (! $isAllYears && (int)$activeFiscalYear === (int)$yr) ? 'selected' : '' }}>{{ $yr }}</option>
@@ -37,7 +37,7 @@
             </div>
             <div class="input-group input-group-sm" style="width: auto;">
                 <span class="input-group-text bg-light text-muted py-0 px-2 font-weight-bold" style="font-size: 0.75rem;">Bulan:</span>
-                <select name="month" class="form-control form-control-sm font-weight-bold" onchange="this.form.submit()" style="font-size: 0.75rem; height: 30px;">
+                <select name="month" id="filter-month-select" class="form-control form-control-sm font-weight-bold" style="font-size: 0.75rem; height: 30px;">
                     <option value="all" {{ $isAllMonths ? 'selected' : '' }}>Semua Bulan</option>
                     @foreach($months as $mCode => $mName)
                         <option value="{{ $mCode }}" {{ (! $isAllMonths && $selectedMonth === $mCode) ? 'selected' : '' }}>{{ $mName }}</option>
@@ -50,7 +50,7 @@
             <i class="fas fa-bolt mr-1"></i> Upload Struk OCR
         </button>
         <button type="button" class="btn btn-sm btn-primary shadow-sm font-weight-bold" id="btn-open-ai" onclick="window.openUploadModal('batch')" data-toggle="modal" data-target="#modalScanReceipt">
-            <i class="fas fa-robot mr-1"></i> Upload Struk AI
+            <i class="fas fa-layer-group mr-1"></i> Upload Batch (Massal)
         </button>
     </div>
 </div>
@@ -442,18 +442,15 @@
                     <span class="badge badge-info px-2.5 py-1.5 font-weight-bold font-tabular" style="font-size: 0.78rem;">
                         <i class="fas fa-calculator mr-1"></i> Rata-rata/Bulan: Rp {{ number_format($totalMonthlyAvg, 0, ',', '.') }}
                     </span>
-                    <span class="badge badge-primary px-2.5 py-1.5 font-weight-bold font-tabular" style="font-size: 0.78rem; background-color: #6366f1;">
-                        <i class="fas fa-bullseye mr-1"></i> Acuan RKA (12 Bln): Rp {{ number_format($totalProjectedAnnual, 0, ',', '.') }}
-                    </span>
                     <span class="badge badge-success px-2.5 py-1.5 font-weight-bold font-tabular" style="font-size: 0.78rem;" id="badge-month-total">
-                        Total Terbayar: Rp {{ number_format($monthTotalExpenses, 0, ',', '.') }}
+                        Pembayaran Bulan Ini: Rp {{ number_format($monthTotalExpenses, 0, ',', '.') }}
                     </span>
                 @else
                     <span class="badge badge-info px-2.5 py-1.5 font-weight-bold font-tabular" style="font-size: 0.78rem;" id="badge-compliance-count">
                         Kepatuhan: <strong>{{ $paidCount }}</strong> dari {{ $totalProfilesCount }} Terpenuhi
                     </span>
                     <span class="badge badge-success px-2.5 py-1.5 font-weight-bold font-tabular" style="font-size: 0.78rem;" id="badge-month-total">
-                        Total Bulan Ini: Rp {{ number_format($monthTotalExpenses, 0, ',', '.') }}
+                        Pembayaran Bulan Ini: Rp {{ number_format($monthTotalExpenses, 0, ',', '.') }}
                     </span>
                 @endif
             </div>
@@ -499,16 +496,12 @@
                             @if($isAllMonths || $isAllYears)
                                 <div class="mt-2 pt-1 border-top" style="font-size: 0.73rem;">
                                     <div class="d-flex justify-content-between align-items-center mb-0.5">
-                                        <span class="text-muted">Total Bayar:</span>
-                                        <span class="font-weight-bold font-tabular text-dark">Rp {{ number_format($item['total_paid'], 0, ',', '.') }}</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-center mb-0.5">
-                                        <span class="text-primary font-weight-500"><i class="fas fa-calculator mr-1"></i>Rata2/Bln:</span>
-                                        <span class="font-weight-bold font-tabular text-primary">Rp {{ number_format($item['avg_per_month'], 0, ',', '.') }}</span>
+                                        <span class="text-muted">Pembayaran Bulan Ini:</span>
+                                        <span class="font-weight-bold font-tabular text-dark">Rp {{ number_format($item['current_month_paid'] ?? 0, 0, ',', '.') }}</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <span class="text-indigo font-weight-500" style="color: #6366f1;"><i class="fas fa-bullseye mr-1"></i>Acuan RKA (12bln):</span>
-                                        <span class="font-weight-bold font-tabular" style="color: #4f46e5;">Rp {{ number_format($item['projected_annual'], 0, ',', '.') }}</span>
+                                        <span class="text-primary font-weight-500"><i class="fas fa-calculator mr-1"></i>Rata2/Bln:</span>
+                                        <span class="font-weight-bold font-tabular text-primary">Rp {{ number_format($item['avg_per_month'], 0, ',', '.') }}</span>
                                     </div>
                                 </div>
                             @else
@@ -542,7 +535,7 @@
         <div class="d-flex align-items-center" style="gap: 10px;">
             <i class="fas fa-spinner fa-spin text-warning" style="font-size: 1.3rem;"></i>
             <div>
-                <strong class="d-block" style="font-size: 0.85rem;" id="banner-bg-text">AI Sedang Memproses Struk di Latar Belakang...</strong>
+                <strong class="d-block" style="font-size: 0.85rem;" id="banner-bg-text">Sedang Memproses Struk di Latar Belakang...</strong>
                 <small class="text-muted" id="banner-bg-subtext">Sistem sedang mengekstrak teks struk. Halaman akan terupdate otomatis.</small>
             </div>
         </div>
@@ -579,14 +572,11 @@
                     <thead class="bg-light text-muted uppercase" style="font-size: 0.72rem; letter-spacing: 0.03em;">
                         <tr>
                             <th class="text-center" style="width: 35px;">No</th>
-                            <th>Tanggal & Resi</th>
+                            <th>Tanggal</th>
                             <th>Objek Tagihan</th>
-                            <th>No. Meter / IDPEL</th>
-                            <th>Tarif / Daya</th>
-                            <th>Rincian Biaya</th>
+                            <th>Nama Pel</th>
                             <th>Total Bayar</th>
                             <th>Token & Kertas Kerja</th>
-                            <th class="text-center" style="width: 75px;">Status AI</th>
                             <th class="text-center" style="width: 55px;">Struk</th>
                             <th class="text-center" style="width: 90px;">Aksi</th>
                         </tr>
@@ -616,7 +606,7 @@
                         </li>
                         <li class="nav-item">
                             <a class="nav-link py-1.5 px-3 font-weight-bold" id="tab-batch-btn" data-toggle="pill" href="#tab-batch" role="tab">
-                                <i class="fas fa-robot mr-1"></i> Upload Struk AI (Latar Belakang / Massal)
+                                <i class="fas fa-layer-group mr-1"></i> Upload Batch (Latar Belakang / Massal)
                             </a>
                         </li>
                     </ul>
@@ -731,14 +721,13 @@
                                         <span class="font-weight-bold text-dark" style="font-size: 0.76rem;">
                                             <i class="fas fa-microchip text-primary mr-1"></i> Metode Pemindaian:
                                         </span>
-                                        <select id="select-ocr-engine" class="form-control form-control-sm font-weight-bold" style="height: 28px; font-size: 0.75rem; width: auto; max-width: 280px;">
-                                            <option value="local" selected>🖥️ 100% Lokal (Offline, Cepat & Bebas Kuota)</option>
-                                            <option value="auto">⚡ Otomatis (Lokal Cepat + AI Cadangan)</option>
-                                            <option value="ai">☁️ Cloud AI (Google Gemini Vision)</option>
-                                        </select>
+                                        <span class="badge badge-success px-2 py-1 font-weight-bold" style="font-size: 0.75rem;">
+                                            <i class="fas fa-bolt mr-1"></i> 100% OCR Lokal (Offline & Cepat)
+                                        </span>
+                                        <input type="hidden" id="select-ocr-engine" value="local">
                                     </div>
 
-                                    <!-- Alert status AI/Local Match -->
+                                    <!-- Alert status Local Match -->
                                     <div id="alert-ai-match" class="alert alert-info py-2 px-3 mb-2.5 d-none" style="font-size: 0.78rem;">
                                         <i class="fas fa-check-circle text-success mr-1"></i>
                                         <span id="label-match-engine">Sistem mengenali:</span> <strong id="label-ai-matched">SMK PGRI KRAS</strong>
@@ -939,12 +928,11 @@
                             <div class="col-md-4">
                                 <div class="p-3 bg-light rounded border h-100">
                                     <h6 class="font-weight-bold text-dark mb-2" style="font-size: 0.85rem;">
-                                        <i class="fas fa-robot text-primary mr-1"></i> Cara Kerja Upload Struk AI
+                                        <i class="fas fa-layer-group text-primary mr-1"></i> Cara Kerja Upload Batch
                                     </h6>
                                     <ul class="text-muted pl-3 mb-3" style="font-size: 0.78rem; line-height: 1.5;">
                                         <li>Pilih <strong>1 hingga 9 foto struk</strong> sekaligus (Listrik, Telepon, Internet).</li>
-                                        <li>Sistem otomatis mendeteksi <strong>ID Pelanggan, Bulan & Nominal</strong> masing-masing struk di latar belakang.</li>
-                                        <li>Jika AI gagal karena server sibuk (503), sistem akan <strong>otomatis mencoba ulang</strong> secara berkala.</li>
+                                        <li>Sistem otomatis mengekstrak <strong>ID Pelanggan, Bulan & Nominal</strong> masing-masing struk di latar belakang.</li>
                                         <li>Data tabel & matriks tagihan terupdate otomatis begitu proses selesai.</li>
                                     </ul>
 
@@ -992,7 +980,7 @@
                         <div class="d-flex justify-content-end align-items-center pt-2 border-top" style="gap: 8px;">
                             <button type="button" class="btn btn-sm btn-secondary" data-dismiss="modal" data-bs-dismiss="modal" onclick="window.hideModal('#modalScanReceipt')">Batal</button>
                             <button type="button" class="btn btn-sm btn-success font-weight-bold px-3" id="btn-submit-batch" disabled>
-                                <i class="fas fa-cloud-arrow-up mr-1"></i> Simpan & Mulai Proses AI di Latar Belakang
+                                <i class="fas fa-cloud-arrow-up mr-1"></i> Simpan & Proses di Latar Belakang
                             </button>
                         </div>
                     </form>
@@ -1037,9 +1025,14 @@
                     <div class="form-group mb-2" id="edit-group-kertas-kerja">
                         <div class="d-flex justify-content-between align-items-center mb-0.5">
                             <label class="font-weight-bold text-dark mb-0" style="font-size: 0.78rem;">Hubungkan ke Kertas Kerja (BOS)</label>
-                            <span class="badge badge-secondary d-none" id="edit-badge-non-budgeted">
-                                <i class="fas fa-shield-alt mr-1"></i>Non-Anggaran BOS (Internal)
-                            </span>
+                            <div class="d-flex align-items-center" style="gap: 5px;">
+                                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1.5" id="btn-edit-auto-match-kk" style="font-size: 0.7rem;" title="Cocokkan otomatis berdasarkan akun profil, bulan, dan nominal tagihan">
+                                    <i class="fas fa-magic mr-1"></i>Cocokkan Otomatis
+                                </button>
+                                <span class="badge badge-secondary d-none" id="edit-badge-non-budgeted">
+                                    <i class="fas fa-shield-alt mr-1"></i>Non-Anggaran BOS (Internal)
+                                </span>
+                            </div>
                         </div>
                         <div id="edit-wrapper-kertas-kerja">
                             <select name="bos_kertas_kerja_item_id" id="edit_bos_kertas_kerja_item_id" class="form-control form-control-sm" style="font-size: 0.8rem;">
@@ -1436,7 +1429,7 @@ $(document).on('input', '.token-input, #field_token_number, #edit_token_number',
     input.setSelectionRange(newCursor, newCursor);
 });
 
-window.findBestKertasKerjaOption = function(selectId, category, month, totalAmount) {
+window.findBestKertasKerjaOption = function(selectId, category, month, totalAmount, profileId) {
     let select = $(selectId);
     if (!month || select.length === 0) return null;
 
@@ -1466,6 +1459,7 @@ window.findBestKertasKerjaOption = function(selectId, category, month, totalAmou
     }
 
     let parsedAmount = typeof parseMoneyValue === 'function' ? parseMoneyValue(totalAmount || 0) : parseFloat(String(totalAmount || 0).replace(/[^0-9]/g, ''));
+    let targetProfileId = profileId ? parseInt(profileId) : null;
 
     let candidates = [];
     select.find('option').each(function() {
@@ -1475,20 +1469,37 @@ window.findBestKertasKerjaOption = function(selectId, category, month, totalAmou
         let optMonth = String($(this).data('month') || '').trim().toLowerCase();
         if (optMonth !== cleanMonth) return;
 
+        let optProfileId = parseInt($(this).data('profile-id')) || null;
         let optCat = $(this).data('category') || '';
         let optKegiatan = String($(this).data('kegiatan') || '').toLowerCase();
         let optDesc = String($(this).data('desc') || '').toLowerCase();
         let optTotal = parseFloat($(this).data('total')) || 0;
 
         let matchScore = 0;
+
+        // Prioritas tertinggi: profil ID cocok persis
+        if (targetProfileId && optProfileId && targetProfileId === optProfileId) {
+            matchScore += 100;
+        }
+
         if (targetCat === 'internet') {
             if (optCat === 'internet' || optKegiatan.includes('internet')) matchScore += 10;
         } else if (targetCat === 'telepon') {
             if (optCat === 'telepon' || optKegiatan.includes('telepon')) matchScore += 10;
-            if (optDesc.includes('telepon') || optDesc.includes('speedy')) matchScore += 5;
-            if (optCat === 'internet' && optDesc.includes('telepon')) matchScore += 8;
+            if (optDesc.includes('telepon') || optDesc.includes('speedy') || optDesc.includes('indihome')) matchScore += 5;
+            if (optCat === 'internet' && (optDesc.includes('telepon') || optDesc.includes('speedy'))) matchScore += 8;
         } else if (targetCat === 'listrik') {
             if (optCat === 'listrik' || optKegiatan.includes('listrik')) matchScore += 10;
+        }
+
+        // Skor tambahan untuk kedekatan nominal jika totalAmount valid (> 0)
+        if (parsedAmount > 0 && optTotal > 0) {
+            let maxVal = Math.max(parsedAmount, optTotal);
+            let diff = Math.abs(optTotal - parsedAmount);
+            let closenessRatio = 1 - (diff / maxVal); // 1 = cocok persis, 0 = beda jauh
+            if (closenessRatio > 0.5) {
+                matchScore += (closenessRatio * 20); // Tambahan s.d. 20 poin
+            }
         }
 
         if (matchScore > 0) {
@@ -1505,7 +1516,7 @@ window.findBestKertasKerjaOption = function(selectId, category, month, totalAmou
     if (candidates.length === 0) return null;
 
     candidates.sort(function(a, b) {
-        if (b.score !== a.score) return b.score - a.score;
+        if (Math.abs(b.score - a.score) > 0.01) return b.score - a.score;
         return a.diff - b.diff;
     });
 
@@ -1538,18 +1549,20 @@ $(document).ready(function() {
                 d.month = "{{ $selectedMonth }}";
                 d.category = currentCategoryFilter;
                 d.profile_id = currentProfileFilter;
+            },
+            error: function(xhr, error, thrown) {
+                if (xhr.status === 401 || xhr.status === 419) {
+                    console.warn('Session expired during DataTables request.');
+                }
             }
         },
         columns: [
             { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center font-tabular text-muted' },
             { data: 'date_display', name: 'transaction_date' },
             { data: 'profile_display', name: 'profile.name' },
-            { data: 'account_display', name: 'customer_number' },
-            { data: 'tariff_display', name: 'tariff_power' },
-            { data: 'breakdown_display', name: 'base_amount' },
+            { data: 'account_display', name: 'customer_name' },
             { data: 'total_display', name: 'total_amount', className: 'text-right' },
             { data: 'token_display', name: 'token_number' },
-            { data: 'status_display', name: 'ocr_status', className: 'text-center' },
             { data: 'receipt_image_display', name: 'receipt_file', orderable: false, searchable: false, className: 'text-center' },
             { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-center' }
         ],
@@ -1571,6 +1584,17 @@ $(document).ready(function() {
         },
         drawCallback: function() {
             checkBackgroundJobs();
+        }
+    });
+
+    // Form Filter Tahun & Bulan Navigation Handler
+    let isSubmittingPeriod = false;
+    $('#filter-year-select, #filter-month-select').on('change', function() {
+        if (isSubmittingPeriod) return;
+        isSubmittingPeriod = true;
+        let form = document.getElementById('form-filter-period');
+        if (form) {
+            form.submit();
         }
     });
 
@@ -1726,7 +1750,7 @@ $(document).ready(function() {
             processData: false,
             contentType: false,
             success: function(res) {
-                btn.prop('disabled', false).html('<i class="fas fa-cloud-arrow-up mr-1"></i> Simpan & Mulai Proses AI di Latar Belakang');
+                btn.prop('disabled', false).html('<i class="fas fa-cloud-arrow-up mr-1"></i> Simpan & Proses di Latar Belakang');
                 window.hideModal('#modalScanReceipt');
                 batchSelectedFiles = [];
                 renderBatchFilesList();
@@ -1737,7 +1761,7 @@ $(document).ready(function() {
                 Swal.fire({
                     icon: 'success',
                     title: 'Upload Batch Berhasil!',
-                    text: res.message || 'Berkas tersimpan dan AI sedang memproses di latar belakang.',
+                    text: res.message || 'Berkas tersimpan dan sedang diproses di latar belakang.',
                     confirmButtonText: 'OK'
                 }).then(() => {
                     if (batchMonth) {
@@ -1749,7 +1773,7 @@ $(document).ready(function() {
                 });
             },
             error: function(xhr) {
-                btn.prop('disabled', false).html('<i class="fas fa-cloud-arrow-up mr-1"></i> Simpan & Mulai Proses AI di Latar Belakang');
+                btn.prop('disabled', false).html('<i class="fas fa-cloud-arrow-up mr-1"></i> Simpan & Proses di Latar Belakang');
                 let msg = xhr.responseJSON ? xhr.responseJSON.message : 'Terjadi kesalahan saat mengunggah batch.';
                 Swal.fire('Gagal Upload', msg, 'error');
             }
@@ -1794,15 +1818,20 @@ $(document).ready(function() {
                 if (res.success) {
                     if (res.has_pending) {
                         $('#banner-bg-processing').removeClass('d-none').addClass('d-flex');
-                        $('#banner-bg-text').text(`AI Sedang Memproses ${res.pending_count} Struk di Latar Belakang...`);
+                        $('#banner-bg-text').text(`Sedang Memproses ${res.pending_count} Struk di Latar Belakang...`);
                     } else {
                         stopAutoPolling();
                     }
 
                     if (res.matrix) {
                         $('#badge-compliance-count').html(`Kepatuhan: <strong>${res.matrix.paid_count}</strong> dari ${res.matrix.total_profiles} Terpenuhi`);
-                        $('#badge-month-total').text(`Total Bulan Ini: ${res.matrix.month_total}`);
+                        $('#badge-month-total').text(`Pembayaran Bulan Ini: ${res.matrix.month_total}`);
                     }
+                }
+            },
+            error: function(xhr) {
+                if (xhr.status === 401 || xhr.status === 419) {
+                    stopAutoPolling();
                 }
             }
         });
@@ -2391,7 +2420,7 @@ $(document).ready(function() {
         $('#scan-loading-spinner').removeClass('d-none').addClass('d-flex');
 
         // Check if browser Tesseract is available and file is image
-        if (window.Tesseract && (!file || file.type.match('image.*')) && engine !== 'ai') {
+        if (window.Tesseract && (!file || file.type.match('image.*'))) {
             // LANGKAH 2: Jalankan Filter Cerdas di awal untuk memaksimalkan kontras kertas & tinta cetak
             $('#scan-loading-spinner .font-weight-bold').text('Menjalankan Filter Cerdas...');
             $('#scan-loading-spinner small').text('Memaksimalkan kontras & ketajaman karakter teks...');
@@ -2546,7 +2575,7 @@ $(document).ready(function() {
         }
 
         // Direct request to server
-        $('#scan-loading-spinner .font-weight-bold').text(engine === 'local' ? 'OCR Lokal sedang memindai struk...' : (engine === 'ai' ? 'AI Cloud sedang memproses...' : 'Memindai struk...'));
+        $('#scan-loading-spinner .font-weight-bold').text('OCR Lokal sedang memindai struk...');
         $('#scan-loading-spinner small').text('Mengekstrak tanggal, IDPEL, nominal, dan token');
         sendOcrRequest(file, base64Data, '', engine);
     }
@@ -2582,7 +2611,6 @@ $(document).ready(function() {
                 if (res.success && res.data) {
                     populateExtractedData(res.data, res.engine);
                     renderSmartChips(res.data);
-                    let isLocal = (res.engine === 'local_regex_parser');
                     if (res.duplicate) {
                         Swal.fire({
                             icon: 'warning',
@@ -2597,8 +2625,8 @@ $(document).ready(function() {
                     } else {
                         Swal.fire({
                             icon: 'success',
-                            title: isLocal ? 'Scan OCR Lokal Berhasil!' : 'Scan AI Berhasil!',
-                            text: isLocal ? 'Data berhasil dicocokkan dengan 9 Profil Master Tagihan tanpa AI (100% Offline).' : 'Informasi struk berhasil diekstrak via AI.',
+                            title: 'Scan OCR Lokal Berhasil!',
+                            text: 'Data berhasil dicocokkan dengan Master Profil Tagihan (100% Offline).',
                             timer: 2200,
                             showConfirmButton: false,
                             toast: true,
@@ -2620,18 +2648,6 @@ $(document).ready(function() {
 
     function populateExtractedData(d, engine) {
         $('#form_ocr_raw_data').val(JSON.stringify(d.raw_ocr || d));
-
-        if (d.matched_profile_id) {
-            $('#field_utility_profile_id').val(d.matched_profile_id).trigger('change');
-            let engineBadge = (engine === 'local_regex_parser' || d.engine === 'local_regex_parser')
-                ? ' <span class="badge badge-success ml-1" style="font-size: 0.68rem;"><i class="fas fa-bolt mr-0.5"></i>Lokal Non-AI</span>'
-                : ' <span class="badge badge-primary ml-1" style="font-size: 0.68rem;"><i class="fas fa-robot mr-0.5"></i>AI Cloud</span>';
-            $('#label-match-engine').text('Sistem mengenali:');
-            $('#label-ai-matched').html((d.matched_profile_name || 'Profil Terdaftar') + engineBadge);
-            $('#alert-ai-match').removeClass('d-none');
-        } else if (d.utility_type) {
-            adjustFormFieldsByCategory(d.utility_type);
-        }
 
         if (d.transaction_date) {
             let dt = new Date(d.transaction_date);
@@ -2660,6 +2676,16 @@ $(document).ready(function() {
         }
         if (d.receipt_number) $('#field_receipt_number').val(d.receipt_number);
         if (d.payment_merchant) $('#field_payment_merchant').val(d.payment_merchant);
+
+        if (d.matched_profile_id) {
+            $('#field_utility_profile_id').val(d.matched_profile_id).trigger('change');
+            let engineBadge = ' <span class="badge badge-success ml-1" style="font-size: 0.68rem;"><i class="fas fa-bolt mr-0.5"></i>OCR Lokal</span>';
+            $('#label-match-engine').text('Sistem mengenali:');
+            $('#label-ai-matched').html((d.matched_profile_name || 'Profil Terdaftar') + engineBadge);
+            $('#alert-ai-match').removeClass('d-none');
+        } else if (d.utility_type) {
+            adjustFormFieldsByCategory(d.utility_type);
+        }
 
         updateAmountVerification();
     }
@@ -2802,7 +2828,7 @@ $(document).ready(function() {
             let cat = opt.data('category') || 'listrik_pra';
             let totalAmount = $('#field_total_amount').val();
             if (profileId && billingMonth) {
-                let bestMatch = window.findBestKertasKerjaOption('#field_bos_kertas_kerja_item_id', cat, billingMonth, totalAmount);
+                let bestMatch = window.findBestKertasKerjaOption('#field_bos_kertas_kerja_item_id', cat, billingMonth, totalAmount, profileId);
                 if (bestMatch) {
                     $('#field_bos_kertas_kerja_item_id').val(bestMatch);
                 }
@@ -2812,16 +2838,16 @@ $(document).ready(function() {
         updateAmountVerification();
     });
 
-    $('#field_billing_month').on('change', function() {
+    $('#field_billing_month, #field_total_amount').on('change', function() {
         let profileOpt = $('#field_utility_profile_id').find('option:selected');
         let isBudgeted = profileOpt.data('budgeted');
         if (isBudgeted !== 0 && isBudgeted !== '0') {
             let profileId = $('#field_utility_profile_id').val();
-            let billingMonth = $(this).val();
+            let billingMonth = $('#field_billing_month').val();
             let cat = profileOpt.data('category') || 'listrik_pra';
             let totalAmount = $('#field_total_amount').val();
             if (profileId && billingMonth) {
-                let bestMatch = window.findBestKertasKerjaOption('#field_bos_kertas_kerja_item_id', cat, billingMonth, totalAmount);
+                let bestMatch = window.findBestKertasKerjaOption('#field_bos_kertas_kerja_item_id', cat, billingMonth, totalAmount, profileId);
                 if (bestMatch) {
                     $('#field_bos_kertas_kerja_item_id').val(bestMatch);
                 }
@@ -3937,7 +3963,7 @@ $(document).ready(function() {
             let billingMonth = $('#edit_billing_month').val();
             let totalAmount = $('#edit_total_amount').val();
             if (profileId && billingMonth && !$('#edit_bos_kertas_kerja_item_id').val()) {
-                let bestMatch = window.findBestKertasKerjaOption('#edit_bos_kertas_kerja_item_id', cat, billingMonth, totalAmount);
+                let bestMatch = window.findBestKertasKerjaOption('#edit_bos_kertas_kerja_item_id', cat, billingMonth, totalAmount, profileId);
                 if (bestMatch) {
                     $('#edit_bos_kertas_kerja_item_id').val(bestMatch);
                 }
@@ -3946,20 +3972,56 @@ $(document).ready(function() {
         adjustEditFormFieldsByCategory(cat);
     });
 
-    $('#edit_billing_month').on('change input', function() {
+    $('#edit_billing_month, #edit_total_amount').on('change input', function() {
         let profileOpt = $('#edit_utility_profile_id').find('option:selected');
         let isBudgeted = profileOpt.data('budgeted');
         if (isBudgeted !== 0 && isBudgeted !== '0') {
             let profileId = $('#edit_utility_profile_id').val();
-            let billingMonth = $(this).val();
+            let billingMonth = $('#edit_billing_month').val();
             let cat = profileOpt.data('category') || 'listrik_pra';
             let totalAmount = $('#edit_total_amount').val();
             if (profileId && billingMonth && !$('#edit_bos_kertas_kerja_item_id').val()) {
-                let bestMatch = window.findBestKertasKerjaOption('#edit_bos_kertas_kerja_item_id', cat, billingMonth, totalAmount);
+                let bestMatch = window.findBestKertasKerjaOption('#edit_bos_kertas_kerja_item_id', cat, billingMonth, totalAmount, profileId);
                 if (bestMatch) {
                     $('#edit_bos_kertas_kerja_item_id').val(bestMatch);
                 }
             }
+        }
+    });
+
+    $('#btn-edit-auto-match-kk').on('click', function() {
+        let profileOpt = $('#edit_utility_profile_id').find('option:selected');
+        let isBudgeted = profileOpt.data('budgeted');
+        if (isBudgeted === 0 || isBudgeted === '0') {
+            Swal.fire('Info', 'Akun ini ditandai sebagai Non-Anggaran BOS (Internal).', 'info');
+            return;
+        }
+
+        let profileId = $('#edit_utility_profile_id').val();
+        let billingMonth = $('#edit_billing_month').val();
+        let cat = profileOpt.data('category') || 'listrik_pra';
+        let totalAmount = $('#edit_total_amount').val();
+
+        if (!profileId || !billingMonth) {
+            Swal.fire('Perhatian', 'Pilih akun objek tagihan dan isi bulan terlebih dahulu.', 'warning');
+            return;
+        }
+
+        let bestMatch = window.findBestKertasKerjaOption('#edit_bos_kertas_kerja_item_id', cat, billingMonth, totalAmount, profileId);
+        if (bestMatch) {
+            $('#edit_bos_kertas_kerja_item_id').val(bestMatch);
+            let optText = $('#edit_bos_kertas_kerja_item_id option:selected').text();
+            Swal.fire({
+                icon: 'success',
+                title: 'Kertas Kerja Ditemukan',
+                text: 'Berhasil dicocokkan ke: ' + optText,
+                timer: 1800,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+        } else {
+            Swal.fire('Informasi', 'Tidak ditemukan item anggaran Kertas Kerja yang sesuai untuk bulan dan akun ini.', 'info');
         }
     });
 
@@ -4162,7 +4224,7 @@ $(document).ready(function() {
                             </div>
 
                             <table class="table table-sm table-bordered text-dark" style="font-size: 0.82rem;">
-                                <tr><th class="bg-light" style="width: 38%;">Status AI</th><td>${r.ocr_status_badge || '-'}</td></tr>
+                                <tr><th class="bg-light" style="width: 38%;">Status OCR</th><td>${r.ocr_status_badge || '-'}</td></tr>
                                 <tr><th class="bg-light">Tanggal Bayar</th><td class="font-tabular">${r.transaction_date ? r.transaction_date.substring(0, 19).replace('T', ' ') : '-'}</td></tr>
                                 <tr><th class="bg-light">Periode Tagihan</th><td>${r.billing_month || '-'} ${r.fiscal_year}</td></tr>
                                 <tr><th class="bg-light">No. Meter</th><td class="font-tabular font-weight-bold">${r.meter_number || '-'}</td></tr>
@@ -4174,7 +4236,7 @@ $(document).ready(function() {
                                 <tr class="table-primary"><th class="font-weight-bold">TOTAL DIBAYAR</th><td class="font-weight-bold font-tabular text-dark" style="font-size: 0.95rem;">Rp ${Number(r.total_amount || 0).toLocaleString('id-ID')}</td></tr>
                                 ${r.token_number ? `<tr class="table-warning"><th class="font-weight-bold">STROOM / TOKEN</th><td class="font-weight-bold font-monospace text-dark" style="font-size: 0.9rem;">${r.token_number}</td></tr>` : ''}
                             </table>
-                            ${r.ocr_error_message ? `<div class="alert alert-danger py-1.5 px-2 mt-2"><small><strong>Catatan Error AI:</strong> ${r.ocr_error_message}</small></div>` : ''}
+                            ${r.ocr_error_message ? `<div class="alert alert-danger py-1.5 px-2 mt-2"><small><strong>Catatan Error:</strong> ${r.ocr_error_message}</small></div>` : ''}
                             ${r.notes ? `<div class="alert alert-secondary py-1.5 px-2 mt-2"><small><strong>Catatan:</strong> ${r.notes}</small></div>` : ''}
                         </div>
                     </div>

@@ -23,6 +23,17 @@
             {{-- Fiscal Year Selector --}}
             @if(Auth::check())
                 @include('partials.fiscal_year_selector')
+
+                {{-- Compact Mode Toggle (Laptop & High-Density Space Saver) --}}
+                <li class="nav-item me-2" style="margin-right: 8px;">
+                    <button type="button" id="btnToggleCompactMode" class="btn btn-sm d-flex align-items-center py-1 px-2 border" 
+                            style="font-size: 0.8rem; font-weight: 600; border-radius: 6px; background: #f8fafc; color: #475569; transition: all 0.15s ease-in-out;"
+                            title="Klik untuk Mengaktifkan / Mematikan Mode Kompak (Hemat ruang untuk laptop)">
+                        <i class="fas fa-compress-arrows-alt me-1 mr-1 text-primary" id="compactModeIcon"></i>
+                        <span class="d-none d-sm-inline" id="compactModeLabel">Kompak: <strong id="compactModeStatus" class="text-secondary">Off</strong></span>
+                        <span class="d-inline d-sm-none" id="compactModeLabelShort">Kompak</span>
+                    </button>
+                </li>
             @endif
 
             {{-- Custom right links --}}

@@ -220,14 +220,6 @@
             text-decoration: underline;
         }
 
-        .page-footer-num {
-            position: absolute;
-            bottom: 15mm;
-            left: 20mm;
-            font-size: 9pt;
-            color: #666;
-        }
-
         @media print {
             body {
                 background: none;
@@ -347,8 +339,14 @@
                     <table>
                         <tr>
                             <td width="15px" style="vertical-align: top;">-</td>
-                            <td width="115px">Maksud Dinas</td>
+                            <td width="115px">Nomor Surat</td>
                             <td width="15px">:</td>
+                            <td>{{ $perjadin->letter_number ?: '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td>-</td>
+                            <td>Maksud Dinas</td>
+                            <td>:</td>
                             <td>{{ $perjadin->activity_purpose }}</td>
                         </tr>
                         <tr>
@@ -433,11 +431,6 @@
             </td>
         </tr>
     </table>
-
-    {{-- Nomor Halaman / Catatan kaki --}}
-    <div class="page-footer-num">
-        {{ $index + 1 }}
-    </div>
 </div>
 @endforeach
 

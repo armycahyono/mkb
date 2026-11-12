@@ -26,7 +26,9 @@ class PerjadinTemplateExport implements Export, WithMultipleSheets
                 public function headings(): array
                 {
                     return [
-                        'Tanggal (YYYY-MM-DD)',
+                        'No',
+                        'Tanggal',
+                        'No Surat',
                         'Tujuan Dinas',
                         'Alamat Tujuan (Opsional)',
                         'Maksud Perjalanan',
@@ -60,35 +62,38 @@ class PerjadinTemplateExport implements Export, WithMultipleSheets
 
                     return [
                         // Kelompok 1: 5 orang ke SMPN 1 Ringinrejo tgl 2026-05-03 (BKU Awal BPU070 -> BPU070-074)
-                        ['2026-05-03', 'SMPN 1 Ringinrejo', 'Jl. Marabunta, Ds. Selodono, Kec. Ringinrejo', 'Sosialisasi Asesmen Nasional', $g1, 65000, 'BPU070', 0, 0, 'Koordinasi Teknis'],
-                        ['2026-05-03', 'SMPN 1 Ringinrejo', 'Jl. Marabunta, Ds. Selodono, Kec. Ringinrejo', 'Sosialisasi Asesmen Nasional', $g2, 65000, '', 0, 0, ''],
-                        ['2026-05-03', 'SMPN 1 Ringinrejo', 'Jl. Marabunta, Ds. Selodono, Kec. Ringinrejo', 'Sosialisasi Asesmen Nasional', $g3, 65000, '', 0, 0, ''],
-                        ['2026-05-03', 'SMPN 1 Ringinrejo', 'Jl. Marabunta, Ds. Selodono, Kec. Ringinrejo', 'Sosialisasi Asesmen Nasional', $g4, 65000, '', 0, 0, ''],
-                        ['2026-05-03', 'SMPN 1 Ringinrejo', 'Jl. Marabunta, Ds. Selodono, Kec. Ringinrejo', 'Sosialisasi Asesmen Nasional', $g5, 65000, '', 0, 0, ''],
+                        [1, '2026-05-03', '094/082/101.6.21/2026', 'SMPN 1 Ringinrejo', 'Jl. Marabunta, Ds. Selodono, Kec. Ringinrejo', 'Sosialisasi Asesmen Nasional', $g1, 65000, 'BPU070', 0, 0, 'Koordinasi Teknis'],
+                        [2, '2026-05-03', '', 'SMPN 1 Ringinrejo', 'Jl. Marabunta, Ds. Selodono, Kec. Ringinrejo', 'Sosialisasi Asesmen Nasional', $g2, 65000, '', 0, 0, ''],
+                        [3, '2026-05-03', '', 'SMPN 1 Ringinrejo', 'Jl. Marabunta, Ds. Selodono, Kec. Ringinrejo', 'Sosialisasi Asesmen Nasional', $g3, 65000, '', 0, 0, ''],
+                        [4, '2026-05-03', '', 'SMPN 1 Ringinrejo', 'Jl. Marabunta, Ds. Selodono, Kec. Ringinrejo', 'Sosialisasi Asesmen Nasional', $g4, 65000, '', 0, 0, ''],
+                        [5, '2026-05-03', '', 'SMPN 1 Ringinrejo', 'Jl. Marabunta, Ds. Selodono, Kec. Ringinrejo', 'Sosialisasi Asesmen Nasional', $g5, 65000, '', 0, 0, ''],
 
                         // Kelompok 2: 3 orang ke SMPN 2 Kras tgl 2026-05-03 (BKU Awal BPU075 -> BPU075-077)
-                        ['2026-05-03', 'SMPN 2 Kras', 'Jl. Raya Kras No. 45, Kras', 'Monitoring dan Evaluasi Mutu', $g1, 65000, 'BPU075', 0, 0, 'Monev Standar'],
-                        ['2026-05-03', 'SMPN 2 Kras', 'Jl. Raya Kras No. 45, Kras', 'Monitoring dan Evaluasi Mutu', $g2, 65000, '', 0, 0, ''],
-                        ['2026-05-03', 'SMPN 2 Kras', 'Jl. Raya Kras No. 45, Kras', 'Monitoring dan Evaluasi Mutu', $g3, 65000, '', 0, 0, ''],
+                        [6, '2026-05-03', '094/083/101.6.21/2026', 'SMPN 2 Kras', 'Jl. Raya Kras No. 45, Kras', 'Monitoring dan Evaluasi Mutu', $g1, 65000, 'BPU075', 0, 0, 'Monev Standar'],
+                        [7, '2026-05-03', '', 'SMPN 2 Kras', 'Jl. Raya Kras No. 45, Kras', 'Monitoring dan Evaluasi Mutu', $g2, 65000, '', 0, 0, ''],
+                        [8, '2026-05-03', '', 'SMPN 2 Kras', 'Jl. Raya Kras No. 45, Kras', 'Monitoring dan Evaluasi Mutu', $g3, 65000, '', 0, 0, ''],
 
                         // Kelompok 3: 5 orang ke SMPN 3 Kediri tgl 2026-05-04 (BKU Awal BPU078 -> BPU078-082)
-                        ['2026-05-04', 'SMPN 3 Kediri', 'Jl. Hasanudin No. 2, Kediri', 'Workshop Kurikulum Merdeka', $g1, 75000, 'BPU078', 0, 0, 'Pelatihan IKM'],
-                        ['2026-05-04', 'SMPN 3 Kediri', 'Jl. Hasanudin No. 2, Kediri', 'Workshop Kurikulum Merdeka', $g2, 75000, '', 0, 0, ''],
-                        ['2026-05-04', 'SMPN 3 Kediri', 'Jl. Hasanudin No. 2, Kediri', 'Workshop Kurikulum Merdeka', $g3, 75000, '', 0, 0, ''],
-                        ['2026-05-04', 'SMPN 3 Kediri', 'Jl. Hasanudin No. 2, Kediri', 'Workshop Kurikulum Merdeka', $g4, 75000, '', 0, 0, ''],
-                        ['2026-05-04', 'SMPN 3 Kediri', 'Jl. Hasanudin No. 2, Kediri', 'Workshop Kurikulum Merdeka', $g5, 75000, '', 0, 0, ''],
+                        [9, '2026-05-04', '094/084/101.6.21/2026', 'SMPN 3 Kediri', 'Jl. Hasanudin No. 2, Kediri', 'Workshop Kurikulum Merdeka', $g1, 75000, 'BPU078', 0, 0, 'Pelatihan IKM'],
+                        [10, '2026-05-04', '', 'SMPN 3 Kediri', 'Jl. Hasanudin No. 2, Kediri', 'Workshop Kurikulum Merdeka', $g2, 75000, '', 0, 0, ''],
+                        [11, '2026-05-04', '', 'SMPN 3 Kediri', 'Jl. Hasanudin No. 2, Kediri', 'Workshop Kurikulum Merdeka', $g3, 75000, '', 0, 0, ''],
+                        [12, '2026-05-04', '', 'SMPN 3 Kediri', 'Jl. Hasanudin No. 2, Kediri', 'Workshop Kurikulum Merdeka', $g4, 75000, '', 0, 0, ''],
+                        [13, '2026-05-04', '', 'SMPN 3 Kediri', 'Jl. Hasanudin No. 2, Kediri', 'Workshop Kurikulum Merdeka', $g5, 75000, '', 0, 0, ''],
                     ];
                 }
 
                 public function styles(Worksheet $sheet): array
                 {
-                    // Format kolom nominal uang (F, H, I) ke format ribuan
-                    $sheet->getStyle('F2:F200')->getNumberFormat()->setFormatCode('#,##0');
-                    $sheet->getStyle('H2:I200')->getNumberFormat()->setFormatCode('#,##0');
+                    // Alignment Kolom No (A) ke tengah
+                    $sheet->getStyle('A2:A200')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                    // Format kolom tanggal (A) dan BKU (G) sebagai text
-                    $sheet->getStyle('A2:A200')->getNumberFormat()->setFormatCode('@');
-                    $sheet->getStyle('G2:G200')->getNumberFormat()->setFormatCode('@');
+                    // Format kolom nominal uang (H, J, K) ke format ribuan
+                    $sheet->getStyle('H2:H200')->getNumberFormat()->setFormatCode('#,##0');
+                    $sheet->getStyle('J2:K200')->getNumberFormat()->setFormatCode('#,##0');
+
+                    // Format kolom tanggal (B), No Surat (C), dan BKU (I) sebagai text
+                    $sheet->getStyle('B2:C200')->getNumberFormat()->setFormatCode('@');
+                    $sheet->getStyle('I2:I200')->getNumberFormat()->setFormatCode('@');
 
                     return [
                         1 => [

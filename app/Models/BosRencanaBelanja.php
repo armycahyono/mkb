@@ -14,10 +14,12 @@ class BosRencanaBelanja extends Model
 
     protected $fillable = [
         'supplier_id',
+        'guru_id',
         'no_nota',
         'year',
         'month',
         'title',
+        'type',
         'supplier_name',
         'planned_date',
         'status',
@@ -35,6 +37,16 @@ class BosRencanaBelanja extends Model
     public function supplier()
     {
         return $this->belongsTo(Supplier::class, 'supplier_id');
+    }
+
+    public function guru()
+    {
+        return $this->belongsTo(Guru::class, 'guru_id');
+    }
+
+    public function utilityReceipts()
+    {
+        return $this->hasMany(UtilityReceipt::class, 'bos_rencana_belanja_id');
     }
 
     public function items()

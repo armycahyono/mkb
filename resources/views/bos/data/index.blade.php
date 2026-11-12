@@ -60,16 +60,40 @@
 
     /* Force Table Text Alignment */
     .text-right, .text-end, th.text-right, td.text-right, th.text-end, td.text-end,
-    #dataTable td:nth-child(8), #dataTable th:nth-child(8),
-    #dataTable td:nth-child(9), #dataTable th:nth-child(9),
+    #dataTable td:nth-child(6), #dataTable th:nth-child(6),
+    #dataTable td:nth-child(7), #dataTable th:nth-child(7),
     #table-total-amount {
         text-align: right !important;
     }
-    .text-center, th.text-center, td.text-center {
+    .text-center, th.text-center, td.text-center,
+    #dataTable td:nth-child(1), #dataTable th:nth-child(1),
+    #dataTable td:nth-child(2), #dataTable th:nth-child(2),
+    #dataTable td:nth-child(3), #dataTable th:nth-child(3),
+    #dataTable td:nth-child(5), #dataTable th:nth-child(5),
+    #dataTable td:nth-child(10), #dataTable th:nth-child(10) {
         text-align: center !important;
     }
-    .text-left, .text-start, th.text-left, td.text-left, th.text-start, td.text-start {
+    .text-left, .text-start, th.text-left, td.text-left, th.text-start, td.text-start,
+    #dataTable td:nth-child(4), #dataTable th:nth-child(4),
+    #dataTable td:nth-child(8), #dataTable th:nth-child(8),
+    #dataTable td:nth-child(9), #dataTable th:nth-child(9) {
         text-align: left !important;
+    }
+
+    /* Rampingkan kolom data lain dan fokuskan lebar maksimal ke URAIAN */
+    #dataTable th:nth-child(1), #dataTable td:nth-child(1),
+    #dataTable th:nth-child(2), #dataTable td:nth-child(2),
+    #dataTable th:nth-child(3), #dataTable td:nth-child(3),
+    #dataTable th:nth-child(5), #dataTable td:nth-child(5),
+    #dataTable th:nth-child(6), #dataTable td:nth-child(6),
+    #dataTable th:nth-child(7), #dataTable td:nth-child(7),
+    #dataTable th:nth-child(8), #dataTable td:nth-child(8),
+    #dataTable th:nth-child(10), #dataTable td:nth-child(10) {
+        white-space: nowrap !important;
+    }
+    #dataTable th:nth-child(4), #dataTable td:nth-child(4) {
+        width: auto !important;
+        min-width: 250px;
     }
 
     /* ── High-Density Data Table (13px Font, Compact Padding) ── */
@@ -182,24 +206,23 @@
                 <table class="table table-sm table-hover table-bordered table-striped w-100" id="dataTable">
                     <thead>
                         <tr>
-                            <th width="70" class="text-center">ID ARKAS</th>
-                            <th width="75" class="text-center">BULAN</th>
-                            <th width="110">KODE REKENING</th>
-                            <th width="85" class="text-center">PROGRAM</th>
-                            <th>URAIAN</th>
-                            <th width="70" class="text-center">VOLUME</th>
-                            <th width="65" class="text-center">SATUAN</th>
-                            <th width="115" class="text-right">HARGA</th>
-                            <th width="125" class="text-right">JUMLAH</th>
-                            <th width="200">KEGIATAN</th>
-                            <th width="65" class="text-center">AKSI</th>
+                            <th width="45" class="text-center">ID</th>
+                            <th width="65" class="text-center">BULAN</th>
+                            <th width="70" class="text-center">PROGRAM</th>
+                            <th class="text-left text-start">URAIAN</th>
+                            <th width="75" class="text-center">VOL/SAT</th>
+                            <th width="90" class="text-right text-end">HARGA (Rp)</th>
+                            <th width="100" class="text-right text-end">JUMLAH (Rp)</th>
+                            <th width="105" class="text-left text-start">KODE REKENING</th>
+                            <th width="140" class="text-left text-start">KEGIATAN</th>
+                            <th width="55" class="text-center">AKSI</th>
                         </tr>
                     </thead>
                     <tfoot>
                         <tr>
-                            <th colspan="8" class="text-right font-weight-bold">TOTAL ANGGARAN:</th>
-                            <th id="table-total-amount" class="text-right text-primary font-weight-bold font-tabular">Rp 0</th>
-                            <th colspan="2"></th>
+                            <th colspan="6" class="text-right font-weight-bold">TOTAL ANGGARAN:</th>
+                            <th id="table-total-amount" class="text-right text-primary font-weight-bold font-tabular">0</th>
+                            <th colspan="3"></th>
                         </tr>
                     </tfoot>
                 </table>
@@ -456,17 +479,16 @@ $(document).ready(function() {
             }
         },
         columns: [
-            {data: 'arkas_id_display', name: 'arkas_id', className: 'text-center font-tabular'},
-            {data: 'month', name: 'month', className: 'text-center'},
-            {data: 'account_code', name: 'account_code', className: 'font-tabular'},
-            {data: 'program_code', name: 'program_code', defaultContent: '-', className: 'text-center font-tabular'},
-            {data: 'description', name: 'description', className: 'font-weight-500 text-dark'},
-            {data: 'volume_display', name: 'volume', className: 'font-tabular text-center'},
-            {data: 'unit', name: 'unit', className: 'text-center'},
-            {data: 'price_display', name: 'price', className: 'font-tabular text-right text-end'},
-            {data: 'total_amount_display', name: 'total_amount', className: 'font-tabular font-weight-bold text-success text-right text-end'},
-            {data: 'kegiatan_display', name: 'kegiatan'},
-            {data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-center'}
+            {data: 'arkas_id_display', name: 'arkas_id', className: 'text-center font-tabular text-nowrap'},
+            {data: 'month', name: 'month', className: 'text-center text-nowrap'},
+            {data: 'program_code', name: 'program_code', defaultContent: '-', className: 'text-center font-tabular text-nowrap'},
+            {data: 'description', name: 'description', className: 'font-weight-500 text-dark text-start text-left'},
+            {data: 'volume_display', name: 'volume', className: 'font-tabular text-center text-nowrap'},
+            {data: 'price_display', name: 'price', className: 'font-tabular text-right text-end text-nowrap'},
+            {data: 'total_amount_display', name: 'total_amount', className: 'font-tabular font-weight-bold text-success text-right text-end text-nowrap'},
+            {data: 'account_code', name: 'account_code', className: 'font-tabular text-start text-left text-nowrap'},
+            {data: 'kegiatan_display', name: 'kegiatan', className: 'text-start text-left'},
+            {data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-center text-nowrap'}
         ],
         createdRow: function(row, data, dataIndex) {
             if (data.is_exhausted) {
@@ -475,12 +497,12 @@ $(document).ready(function() {
         },
         footerCallback: function(row, data, start, end, display) {
             let api = this.api();
-            let total = api.column(8, {page: 'current'}).data().reduce(function(a, b) {
+            let total = api.column(6, {page: 'current'}).data().reduce(function(a, b) {
                 let valA = typeof a === 'string' ? parseFloat(a.replace(/[^\d]/g, '')) || 0 : a;
                 let valB = typeof b === 'string' ? parseFloat(b.replace(/[^\d]/g, '')) || 0 : b;
                 return valA + valB;
             }, 0);
-            $('#table-total-amount').html('Rp ' + new Intl.NumberFormat('id-ID').format(total));
+            $('#table-total-amount').html(new Intl.NumberFormat('id-ID').format(total));
         },
         drawCallback: function(settings) {
             $('[data-bs-toggle="tooltip"]').tooltip();

@@ -18,9 +18,9 @@ class ProcessPendingUtilityReceiptsCommand extends Command
                             {--sync : Jalankan secara sinkron tanpa queue}';
 
     /**
-     * The console command description.
+     * The command description.
      */
-    protected $description = 'Proses pemindaian AI OCR struk utilitas yang masih berstatus pending/gagal di latar belakang';
+    protected $description = 'Proses pemindaian OCR struk utilitas yang masih berstatus pending/gagal di latar belakang';
 
     /**
      * Execute the console command.

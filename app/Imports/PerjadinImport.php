@@ -2,6 +2,7 @@
 
 namespace App\Imports;
 
+use App\Models\BosKertasKerjaItem;
 use App\Models\Guru;
 use App\Models\GuruJabatan;
 use App\Models\Instansi;
@@ -27,7 +28,7 @@ class PerjadinImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, Wi
 
     private array $importedGroupsSummary = [];
 
-    public function __construct(public string $fundingSource = 'BOSP') {}
+    public function __construct(public string $fundingSource = 'BOSP', public ?int $bosKertasKerjaItemId = null) {}
 
     /**
      * @return array{perjadins: int, items: int, skipped: int, warnings: array, summary: array}
@@ -84,6 +85,11 @@ class PerjadinImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, Wi
         $dataSheet->collection($rows);
     }
 
+    public static function cleanFormulaOrText(mixed $value, int $maxLength = 255): string
+    {
+        return PerjadinDataSheetImport::cleanFormulaOrText($value, $maxLength);
+    }
+
     public static function calculateBkuRange(string $startBku, int $count, string $year): string
     {
         return PerjadinDataSheetImport::calculateBkuRange($startBku, $count, $year);
@@ -119,10 +125,16 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
         $allGurus = Guru::with('primaryBankAccount')->where('is_active', true)->get();
         $allGurusFallback = Guru::with('primaryBankAccount')->get();
 
+        $kkItem = null;
+        if ($this->parent->bosKertasKerjaItemId) {
+            $kkItem = BosKertasKerjaItem::find($this->parent->bosKertasKerjaItemId);
+        }
+
         $groups = [];
         $rowIndex = 1; // Row 1 is header, data starts at row 2
 
         $lastDate = null;
+        $lastLetterNumber = null;
         $lastDestination = null;
         $lastAddress = null;
         $lastPurpose = null;
@@ -130,17 +142,18 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
         foreach ($rows as $row) {
             $rowIndex++;
 
-            // 1. Ambil data mentah baris
+            // 1. Ambil data mentah baris & bersihkan dari formula tak terevaluasi
             $rawDate = $row['tanggal_yyyy_mm_dd'] ?? $row['tanggal'] ?? $row['tgl'] ?? $row['date'] ?? null;
-            $rawDestination = trim((string) ($row['tujuan_dinas'] ?? $row['tujuan'] ?? $row['nama_instansi'] ?? $row['instansi'] ?? ''));
-            $rawAddress = trim((string) ($row['alamat_tujuan_opsional'] ?? $row['alamat_tujuan'] ?? $row['alamat'] ?? ''));
-            $rawPurpose = trim((string) ($row['maksud_perjalanan'] ?? $row['maksud'] ?? $row['kegiatan'] ?? ''));
-            $rawGuru = trim((string) ($row['nama_nip_guru'] ?? $row['nama_guru'] ?? $row['guru'] ?? $row['nip'] ?? ''));
+            $rawLetterNumber = self::cleanFormulaOrText($row['no_surat_opsional'] ?? $row['no_surat'] ?? $row['nomor_surat'] ?? $row['nomor_surat_tugas'] ?? $row['no_st'] ?? $row['surat_tugas'] ?? '', 255);
+            $rawDestination = self::cleanFormulaOrText($row['tujuan_dinas'] ?? $row['tujuan'] ?? $row['nama_instansi'] ?? $row['instansi'] ?? '', 255);
+            $rawAddress = self::cleanFormulaOrText($row['alamat_tujuan_opsional'] ?? $row['alamat_tujuan'] ?? $row['alamat'] ?? '', 500);
+            $rawPurpose = self::cleanFormulaOrText($row['maksud_perjalanan'] ?? $row['maksud'] ?? $row['kegiatan'] ?? '', 255);
+            $rawGuru = self::cleanFormulaOrText($row['nama_nip_guru'] ?? $row['nama_guru'] ?? $row['guru'] ?? $row['nip'] ?? '', 255);
             $rawNominal = $row['uang_diterima_rp'] ?? $row['uang_diterima'] ?? $row['nominal'] ?? $row['jumlah'] ?? 0;
-            $rawBku = trim((string) ($row['no_bku_awal_opsional'] ?? $row['no_bku_awal'] ?? $row['no_bku'] ?? $row['bku'] ?? ''));
+            $rawBku = self::cleanFormulaOrText($row['no_bku_awal_opsional'] ?? $row['no_bku_awal'] ?? $row['no_bku'] ?? $row['bku'] ?? '', 100);
             $rawPpn = $row['ppn_opsional'] ?? $row['ppn'] ?? 0;
             $rawPph23 = $row['pph_2123_opsional'] ?? $row['pph23'] ?? $row['pph'] ?? $row['pph_21'] ?? 0;
-            $rawNotes = trim((string) ($row['catatan_opsional'] ?? $row['catatan'] ?? $row['notes'] ?? ''));
+            $rawNotes = self::cleanFormulaOrText($row['catatan_opsional'] ?? $row['catatan'] ?? $row['notes'] ?? '', 500);
 
             // Abaikan jika baris benar-benar kosong
             if (empty($rawDate) && $rawDestination === '' && $rawGuru === '') {
@@ -149,23 +162,38 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
                 continue;
             }
 
-            // Forward-fill untuk baris yang menggunakan merged cells / hanya mengisi tanggal & tujuan di baris pertama
-            if ($rawGuru !== '') {
-                if (empty($rawDate) && $lastDate) {
-                    $rawDate = $lastDate;
-                }
-                if ($rawDestination === '' && $lastDestination) {
-                    $rawDestination = $lastDestination;
-                }
-                if ($rawAddress === '' && $lastAddress) {
-                    $rawAddress = $lastAddress;
-                }
-                if ($rawPurpose === '' && $lastPurpose) {
-                    $rawPurpose = $lastPurpose;
-                }
+            // 2. Terapkan logika autofill dari baris sebelumnya (Merge Cells support)
+            if (empty($rawDate)) {
+                $rawDate = $lastDate;
+            } else {
+                $lastDate = $rawDate;
             }
 
-            // 2. Parse Tanggal
+            if (empty($rawLetterNumber)) {
+                $rawLetterNumber = $lastLetterNumber;
+            } else {
+                $lastLetterNumber = $rawLetterNumber;
+            }
+
+            if ($rawDestination === '') {
+                $rawDestination = $lastDestination;
+            } else {
+                $lastDestination = $rawDestination;
+            }
+
+            if ($rawAddress === '') {
+                $rawAddress = $lastAddress;
+            } else {
+                $lastAddress = $rawAddress;
+            }
+
+            if ($rawPurpose === '') {
+                $rawPurpose = $lastPurpose;
+            } else {
+                $lastPurpose = $rawPurpose;
+            }
+
+            // 3. Validasi & Parsing Tanggal
             $parsedDate = PerjadinImport::parseExcelDate($rawDate);
             if (! $parsedDate) {
                 $this->parent->addWarning("Baris {$rowIndex}: Tanggal '{$rawDate}' tidak valid atau kosong. Baris dilewati.");
@@ -174,26 +202,19 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
                 continue;
             }
 
-            // 3. Validasi Tujuan
-            if ($rawDestination === '') {
-                $this->parent->addWarning("Baris {$rowIndex}: Tujuan dinas tidak boleh kosong. Baris dilewati.");
+            // 4. Validasi Tujuan Dinas & Maksud
+            if (empty($rawDestination)) {
+                $this->parent->addWarning("Baris {$rowIndex}: Tujuan dinas kosong. Baris dilewati.");
                 $this->parent->addSkipped();
 
                 continue;
             }
 
-            // 4. Default Maksud Kegiatan
-            if ($rawPurpose === '') {
-                $rawPurpose = "Perjalanan Dinas ke {$rawDestination}";
+            if (empty($rawPurpose)) {
+                $rawPurpose = 'Perjalanan Dinas ke '.$rawDestination;
             }
 
-            // Simpan konteks baris untuk forward-fill baris berikutnya
-            $lastDate = $parsedDate;
-            $lastDestination = $rawDestination;
-            $lastAddress = $rawAddress;
-            $lastPurpose = $rawPurpose;
-
-            // 5. Cari Guru
+            // 5. Cari Guru (Prioritaskan Guru Aktif, Fallback ke Semua Guru)
             $guru = PerjadinImport::findGuru($rawGuru, $allGurus) ?? PerjadinImport::findGuru($rawGuru, $allGurusFallback);
             if (! $guru) {
                 $this->parent->addWarning("Baris {$rowIndex}: Guru '{$rawGuru}' tidak ditemukan dalam data guru aktif/terdaftar. Baris dilewati.");
@@ -204,6 +225,9 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
 
             // 6. Parse Nominal Uang Diterima & Pajak
             $amount = PerjadinImport::cleanNumeric($rawNominal);
+            if ($amount <= 0 && $kkItem && (float) $kkItem->price > 0) {
+                $amount = (float) $kkItem->price;
+            }
             $ppn = PerjadinImport::cleanNumeric($rawPpn);
             $pph23 = PerjadinImport::cleanNumeric($rawPph23);
             $netAmount = max(0, $amount - ($ppn + $pph23));
@@ -218,11 +242,15 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
                     'destination_name' => $rawDestination,
                     'destination_address' => $rawAddress,
                     'activity_purpose' => $rawPurpose,
+                    'letter_number' => $rawLetterNumber !== '' ? $rawLetterNumber : null,
                     'bku_initial' => $rawBku !== '' ? $rawBku : null,
                     'notes' => $rawNotes !== '' ? $rawNotes : null,
                     'items' => [],
                 ];
             } else {
+                if (empty($groups[$groupKey]['letter_number']) && $rawLetterNumber !== '') {
+                    $groups[$groupKey]['letter_number'] = $rawLetterNumber;
+                }
                 if (empty($groups[$groupKey]['bku_initial']) && $rawBku !== '') {
                     $groups[$groupKey]['bku_initial'] = $rawBku;
                 }
@@ -251,10 +279,10 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
         // 8. Simpan ke database dalam Transaction
         $allInstansis = Instansi::all();
 
-        DB::transaction(function () use ($groups, $allInstansis) {
+        DB::transaction(function () use ($groups, $allInstansis, $kkItem) {
             foreach ($groups as $group) {
-                $destName = trim($group['destination_name']);
-                $destAddress = $group['destination_address'] ?: null;
+                $destName = trim(self::cleanFormulaOrText($group['destination_name'], 255));
+                $destAddress = ! empty($group['destination_address']) ? trim(self::cleanFormulaOrText($group['destination_address'], 500)) : null;
                 $depDate = $group['departure_date'];
                 $itemCount = count($group['items']);
 
@@ -263,7 +291,7 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
 
                 if (! $instansi) {
                     $instansi = Instansi::create([
-                        'name' => $destName,
+                        'name' => mb_substr($destName, 0, 255),
                         'category' => Instansi::detectCategory($destName),
                         'address' => $destAddress,
                         'city' => 'Kediri',
@@ -294,38 +322,49 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
                     $bkuNumber = PerjadinImport::calculateBkuRange($group['bku_initial'], $itemCount, $year);
                 }
 
-                $accountCode = $this->parent->fundingSource === 'BOSP' ? '5.1.02.04.01.0003' : '5.1.02.04.01.0001';
+                $defaultAccount = $this->parent->fundingSource === 'BOSP' ? '5.1.02.04.01.0003' : '5.1.02.04.01.0001';
+                $accountCode = ($kkItem && ! empty($kkItem->account_code)) ? $kkItem->account_code : $defaultAccount;
 
                 $perjadin = Perjadin::create([
                     'funding_source' => $this->parent->fundingSource,
-                    'bku_number' => $bkuNumber,
+                    'bos_kertas_kerja_item_id' => $kkItem?->id,
+                    'bku_number' => $bkuNumber ? mb_substr($bkuNumber, 0, 100) : null,
+                    'letter_number' => ! empty($group['letter_number']) ? mb_substr($group['letter_number'], 0, 255) : null,
                     'account_code' => $accountCode,
-                    'activity_purpose' => $group['activity_purpose'],
-                    'destination_name' => $destName,
+                    'activity_purpose' => mb_substr($group['activity_purpose'], 0, 65535),
+                    'destination_name' => mb_substr($destName, 0, 255),
                     'destination_address' => $destAddress,
                     'instansi_id' => $instansi->id,
                     'departure_date' => $depDate,
                     'return_date' => $depDate,
                     'payment_date' => null,
-                    'city' => $city,
+                    'city' => mb_substr($city, 0, 100),
                     'kepala_sekolah_id' => $kepsekId,
                     'bendahara_id' => $bendaharaId,
                     'status' => 'draft',
-                    'notes' => $group['notes'] ?? 'Diimpor dari file Excel',
+                    'notes' => ! empty($group['notes']) ? mb_substr($group['notes'], 0, 65535) : 'Diimpor dari file Excel',
                 ]);
 
                 foreach ($group['items'] as $item) {
                     $guru = $item['guru'];
                     $bankAccount = $guru->primaryBankAccount;
 
+                    $amount = (float) $item['amount'];
+                    $ppn = (float) $item['ppn'];
+                    $pph23 = (float) $item['pph23'];
+                    if ($amount <= 0 && $kkItem && (float) $kkItem->price > 0) {
+                        $amount = (float) $kkItem->price;
+                    }
+                    $netAmount = max(0, $amount - ($ppn + $pph23));
+
                     PerjadinItem::create([
                         'perjadin_id' => $perjadin->id,
                         'guru_id' => $guru->id,
                         'guru_bank_account_id' => $bankAccount ? $bankAccount->id : null,
-                        'amount' => $item['amount'],
-                        'ppn' => $item['ppn'],
-                        'pph23' => $item['pph23'],
-                        'net_amount' => $item['net_amount'],
+                        'amount' => $amount,
+                        'ppn' => $ppn,
+                        'pph23' => $pph23,
+                        'net_amount' => $netAmount,
                         'is_paid' => false,
                     ]);
 
@@ -348,6 +387,91 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
     /**
      * Hitung rentang nomor BKU otomatis.
      * Contoh: BPU070 dengan count 5 -> BPU070 - BPU074 / 2026
+    /**
+     * Bersihkan input teks dari formula Excel / Google Sheets yang tidak terevaluasi,
+     * ambil nilai fallback atau teks literalnya, dan pastikan tidak melebihi panjang kolom database.
+     */
+    public static function cleanFormulaOrText(mixed $value, int $maxLength = 255): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        $str = trim((string) $value);
+        if ($str === '') {
+            return '';
+        }
+
+        // Jika berupa formula Excel/Google Sheets (diawali tanda '=')
+        if (str_starts_with($str, '=')) {
+            // Pola 1: IFERROR(..., "Fallback Value") atau IF(..., ..., "Fallback Value")
+            // Contoh: =IFERROR(__xludf.DUMMYFUNCTION(...),"Bengkel Mandala Auto")
+            if (preg_match('/,\s*"((?:[^"]|"")*)"\s*\)+[\s;]*$/u', $str, $matches)) {
+                $extracted = str_replace('""', '"', $matches[1]);
+
+                return mb_substr(trim($extracted), 0, $maxLength);
+            }
+
+            // Pola 2: Fallback dengan petik tunggal: =IFERROR(..., 'Fallback Value')
+            if (preg_match('/,\s*\'((?:[^\']|\'\')*)\'\s*\)+[\s;]*$/u', $str, $matches)) {
+                $extracted = str_replace("''", "'", $matches[1]);
+
+                return mb_substr(trim($extracted), 0, $maxLength);
+            }
+
+            // Pola 3: Formula string literal sederhana: ="Nama Teks" atau ='Nama Teks'
+            if (preg_match('/^=\s*"((?:[^"]|"")*)"\s*$/u', $str, $matches)) {
+                $extracted = str_replace('""', '"', $matches[1]);
+
+                return mb_substr(trim($extracted), 0, $maxLength);
+            }
+            if (preg_match('/^=\s*\'((?:[^\']|\'\')*)\'\s*$/u', $str, $matches)) {
+                $extracted = str_replace("''", "'", $matches[1]);
+
+                return mb_substr(trim($extracted), 0, $maxLength);
+            }
+
+            // Pola 4: HYPERLINK("url", "Nama Tampilan")
+            if (preg_match('/HYPERLINK\s*\([^,]+,\s*"((?:[^"]|"")*)"\s*\)/ui', $str, $matches)) {
+                $extracted = str_replace('""', '"', $matches[1]);
+
+                return mb_substr(trim($extracted), 0, $maxLength);
+            }
+
+            // Pola 5: Cari string literal terakhir yang ada di dalam tanda petik dua
+            if (preg_match_all('/"((?:[^"]|"")*)"/u', $str, $allMatches)) {
+                $candidates = array_filter($allMatches[1], function ($cand) {
+                    $c = trim($cand);
+
+                    return $c !== ''
+                        && ! str_starts_with($c, 'http://')
+                        && ! str_starts_with($c, 'https://')
+                        && ! str_contains($c, '!')
+                        && ! str_contains($c, 'IMPORTRANGE')
+                        && ! str_contains($c, 'XLOOKUP');
+                });
+
+                if (! empty($candidates)) {
+                    $lastCand = end($candidates);
+                    $extracted = str_replace('""', '"', $lastCand);
+
+                    return mb_substr(trim($extracted), 0, $maxLength);
+                }
+            }
+
+            // Fallback: Jika tidak ada string literal yang cocok atau rumus tidak dapat diekstrak,
+            // hapus tanda '=' di awal dan potong string agar tidak error SQL truncation
+            $cleaned = ltrim($str, '=');
+
+            return mb_substr(trim($cleaned), 0, $maxLength);
+        }
+
+        return mb_substr($str, 0, $maxLength);
+    }
+
+    /**
+     * Hitung rentang nomor BKU berdasarkan nomor awal dan jumlah anggota rombongan.
+     * Contoh: BPU070 dengan 5 orang -> "BPU070 - BPU074 / 2026"
      */
     public static function calculateBkuRange(string $bkuInput, int $itemCount, string $year): string
     {
@@ -394,6 +518,14 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
 
         if ($value instanceof \DateTimeInterface) {
             return $value->format('Y-m-d');
+        }
+
+        // Jika string berupa formula Excel (diawali '=')
+        if (is_string($value) && str_starts_with(trim($value), '=')) {
+            $cleanedDate = self::cleanFormulaOrText($value);
+            if ($cleanedDate !== '' && ! str_starts_with($cleanedDate, '=')) {
+                $value = $cleanedDate;
+            }
         }
 
         // Jika numeric serial date dari Excel (misal 45415)
@@ -580,6 +712,20 @@ class PerjadinDataSheetImport implements SkipsEmptyRows, ToCollection, WithHeadi
         }
 
         $str = trim((string) $value);
+
+        // Jika string berupa formula Excel (diawali '=')
+        if (str_starts_with($str, '=')) {
+            if (preg_match('/,\s*([0-9\.,]+)\s*\)+[\s;]*$/u', $str, $m)) {
+                $str = $m[1];
+            } elseif (preg_match('/,\s*"([0-9\.,]+)"\s*\)+[\s;]*$/u', $str, $m)) {
+                $str = $m[1];
+            } elseif (preg_match('/^=\s*([0-9\.,]+)\s*$/u', $str, $m)) {
+                $str = $m[1];
+            } else {
+                $str = self::cleanFormulaOrText($str);
+            }
+        }
+
         $str = preg_replace('/^rp\.?\s*/i', '', $str);
         $str = preg_replace('/,-\s*$/', '', $str);
 

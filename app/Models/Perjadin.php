@@ -18,6 +18,7 @@ class Perjadin extends Model
         'funding_source',
         'bos_kertas_kerja_item_id',
         'bku_number',
+        'letter_number',
         'account_code',
         'activity_purpose',
         'destination_name',

@@ -38,7 +38,8 @@ class UtilityReceiptController extends Controller
             $activeFiscalYear = (int) $activeFiscalYear;
         }
 
-        $selectedMonth = $request->input('month', 'all');
+        $defaultMonth = date('m');
+        $selectedMonth = $request->input('month', $defaultMonth);
         if ($selectedMonth !== 'all' && strlen((string) $selectedMonth) === 1) {
             $selectedMonth = '0'.$selectedMonth;
         }
@@ -71,27 +72,51 @@ class UtilityReceiptController extends Controller
             $receiptsQuery->where(function ($q) use ($selectedMonth, $selectedMonthName) {
                 $q->where('billing_month', $selectedMonth)
                     ->orWhere('billing_month', $selectedMonthName)
-                    ->orWhereMonth('transaction_date', $selectedMonth);
+                    ->orWhere(function ($sub) use ($selectedMonth) {
+                        $sub->where(function ($emptyQ) {
+                            $emptyQ->whereNull('billing_month')->orWhere('billing_month', '');
+                        })->whereMonth('transaction_date', $selectedMonth);
+                    });
             });
         }
 
         $monthReceipts = $receiptsQuery->get();
 
+        // Ambil data pembayaran bulan sekarang untuk keperluan tampilan perbandingan jika memilih Semua Bulan
+        $nowMonthCode = date('m');
+        $nowMonthName = $this->indonesianMonths[$nowMonthCode] ?? '';
+        $currentMonthReceipts = UtilityReceipt::query()
+            ->where(function ($q) use ($nowMonthCode, $nowMonthName) {
+                $q->where('billing_month', $nowMonthCode)
+                    ->orWhere('billing_month', $nowMonthName)
+                    ->orWhere(function ($sub) use ($nowMonthCode) {
+                        $sub->where(function ($emptyQ) {
+                            $emptyQ->whereNull('billing_month')->orWhere('billing_month', '');
+                        })->whereMonth('transaction_date', $nowMonthCode);
+                    });
+            })
+            ->when(! $isAllYears, fn ($q) => $q->where('fiscal_year', $activeFiscalYear))
+            ->get();
+
         // Matriks status per profil
-        $profileMatrix = $profiles->map(function ($profile) use ($monthReceipts) {
+        $profileMatrix = $profiles->map(function ($profile) use ($monthReceipts, $currentMonthReceipts) {
             $receipts = $monthReceipts->where('utility_profile_id', $profile->id);
             $isPaid = $receipts->isNotEmpty();
             $latestReceipt = $receipts->sortByDesc('transaction_date')->first();
             $totalPaid = (float) $receipts->sum('total_amount');
             $receiptCount = $receipts->count();
 
+            // Pembayaran bulan sekarang (current month)
+            $currReceipts = $currentMonthReceipts->where('utility_profile_id', $profile->id);
+            $currentMonthPaid = (float) $currReceipts->sum('total_amount');
+
             // Hitung jumlah bulan unik yang memiliki pembayaran
             $distinctMonthsCount = $receipts->map(function ($r) {
                 $yr = $r->fiscal_year ?: ($r->transaction_date ? $r->transaction_date->format('Y') : '');
-                $m = ! empty($r->billing_month) ? $r->billing_month : ($r->transaction_date ? $r->transaction_date->format('m') : '');
+                $mNum = $this->resolveMonthNumber($r->billing_month) ?: ($r->transaction_date ? (int) $r->transaction_date->format('m') : 0);
 
-                return $yr.'-'.$m;
-            })->filter()->unique()->count();
+                return $yr.'-'.$mNum;
+            })->filter(fn ($v) => ! str_ends_with($v, '-0'))->unique()->count();
 
             // Hitung rata-rata tagihan per bulan aktif dan proyeksi rencana anggaran 12 bulan
             $activeCount = max($distinctMonthsCount, ($receiptCount > 0 ? 1 : 0));
@@ -106,6 +131,7 @@ class UtilityReceiptController extends Controller
                 'receipt_count' => $receiptCount,
                 'distinct_months_count' => $distinctMonthsCount,
                 'total_paid' => $totalPaid,
+                'current_month_paid' => $currentMonthPaid,
                 'avg_per_month' => (float) $avgPerMonth,
                 'projected_annual' => (float) $projectedAnnual,
                 'min_amount' => $minAmount,
@@ -192,7 +218,11 @@ class UtilityReceiptController extends Controller
             $query->where(function ($q) use ($month, $monthName) {
                 $q->where('billing_month', $month)
                     ->orWhere('billing_month', $monthName)
-                    ->orWhereMonth('transaction_date', $month);
+                    ->orWhere(function ($sub) use ($month) {
+                        $sub->where(function ($emptyQ) {
+                            $emptyQ->whereNull('billing_month')->orWhere('billing_month', '');
+                        })->whereMonth('transaction_date', $month);
+                    });
             });
         }
 
@@ -208,30 +238,49 @@ class UtilityReceiptController extends Controller
 
         $query->orderBy('transaction_date', 'desc')->orderBy('id', 'desc');
 
+        $effectiveYear = (! empty($year) && $year !== 'all') ? (int) $year : (int) session('fiscal_year', date('Y'));
+
+        // Preload seluruh item kertas kerja utilitas untuk tahun aktif (untuk kalkulasi anggaran YTD cepat)
+        $utilityKkItems = BosKertasKerjaItem::where('year', $effectiveYear)
+            ->whereHas('file', fn ($f) => $f->where('is_active', true))
+            ->where(function ($q) {
+                $q->where('kegiatan', 'like', '%pembayaran daya%listrik%')
+                    ->orWhere('kegiatan', 'like', '%pembayaran%biaya telepon%')
+                    ->orWhere('kegiatan', 'like', '%pembayaran%jasa internet%')
+                    ->orWhere('program_code', 'like', '06.07.01%')
+                    ->orWhere('program_code', 'like', '07.06.01%')
+                    ->orWhere('program_code', 'like', '06.07.04%')
+                    ->orWhere('program_code', 'like', '07.06.04%')
+                    ->orWhere('program_code', 'like', '06.07.05%')
+                    ->orWhere('program_code', 'like', '07.06.05%');
+            })
+            ->get();
+
+        // Preload seluruh bukti pembayaran utilitas tahun aktif
+        $yearReceipts = UtilityReceipt::where('fiscal_year', $effectiveYear)->get();
+
         return DataTables::of($query)
             ->addIndexColumn()
             ->addColumn('date_display', function ($row) {
                 $tgl = $row->transaction_date ? $row->transaction_date->format('d/m/Y') : '-';
                 $jam = $row->transaction_date ? $row->transaction_date->format('H:i:s') : '';
-                $resi = $row->receipt_number ? '<div class="text-muted font-monospace" style="font-size: 0.72rem;">Resi: '.e($row->receipt_number).'</div>' : '';
 
                 return '<div class="font-weight-bold text-dark font-tabular">'.$tgl.'</div>'.
-                       '<small class="text-muted d-block">'.$jam.'</small>'.$resi;
+                       ($jam ? '<small class="text-muted d-block">'.$jam.'</small>' : '');
             })
             ->addColumn('profile_display', function ($row) {
                 $badge = $row->profile ? $row->profile->category_badge : '<span class="badge badge-secondary px-2 py-1">Utilitas</span>';
                 $nama = $row->profile ? e($row->profile->name) : (e($row->customer_name) ?: 'Tagihan Utilitas');
-                $merchant = $row->payment_merchant ? '<small class="text-muted d-block mt-0.5"><i class="fas fa-store mr-1"></i>'.e($row->payment_merchant).'</small>' : '';
 
                 return '<div class="mb-1">'.$badge.'</div>'.
-                       '<div class="font-weight-bold text-dark" style="font-size: 0.85rem;">'.$nama.'</div>'.$merchant;
+                       '<div class="font-weight-bold text-dark" style="font-size: 0.85rem;">'.$nama.'</div>';
             })
             ->addColumn('account_display', function ($row) {
-                $meter = $row->meter_number ? '<div><span class="text-muted" style="font-size: 0.75rem;">Meter:</span> <strong class="font-tabular text-dark">'.e($row->meter_number).'</strong></div>' : '';
-                $idpel = $row->customer_number ? '<div><span class="text-muted" style="font-size: 0.75rem;">IDPEL:</span> <span class="font-tabular">'.e($row->customer_number).'</span></div>' : '';
-                $nama = $row->customer_name ? '<small class="text-primary d-block font-weight-500 font-italic">a.n. '.e($row->customer_name).'</small>' : '';
+                $nama = e($row->customer_name ?: '-');
+                $idpel = $row->customer_number ? '<small class="text-muted d-block font-tabular font-weight-500">ID: '.e($row->customer_number).'</small>' : '';
+                $meter = ($row->meter_number && $row->meter_number !== $row->customer_number) ? '<small class="text-muted d-block font-tabular">Mtr: '.e($row->meter_number).'</small>' : '';
 
-                return $meter.$idpel.$nama;
+                return '<div class="font-weight-bold text-dark" style="font-size: 0.85rem;">'.$nama.'</div>'.$idpel.$meter;
             })
             ->addColumn('tariff_display', function ($row) {
                 $tarif = $row->tariff_power ? '<span class="badge badge-light border px-2 py-0.5 font-weight-bold">'.e($row->tariff_power).'</span>' : '-';
@@ -264,7 +313,7 @@ class UtilityReceiptController extends Controller
 
                 return '<span class="badge badge-light border text-muted px-2 py-1"><i class="fas fa-unlink mr-1 text-warning"></i>Belum Terhubung</span>';
             })
-            ->addColumn('token_display', function ($row) {
+            ->addColumn('token_display', function ($row) use ($utilityKkItems, $yearReceipts, $month) {
                 $tokenHtml = '';
                 if (! $row->token_number) {
                     $tokenHtml = '<div class="text-muted font-italic" style="font-size: 0.74rem;">- (Bukan Token)</div>';
@@ -280,7 +329,66 @@ class UtilityReceiptController extends Controller
                 if ($row->bos_kertas_kerja_item_id && $row->kertasKerjaItem) {
                     $kk = $row->kertasKerjaItem;
                     $kkTotal = (float) ($kk->total_amount ?: ($kk->price * ($kk->volume ?: 1)));
-                    $kkHtml = '<div class="mt-1"><span class="badge badge-success px-2 py-0.5 font-weight-500" style="white-space: normal; text-align: left; display: inline-block; max-width: 210px; font-size: 0.72rem;" title="'.e($kk->kegiatan).' - Total: Rp '.number_format($kkTotal, 0, ',', '.').'"><i class="fas fa-link mr-1"></i>'.e($kk->description).' ('.e($kk->month).')</span></div>';
+                    $badgeKk = '<span class="badge badge-success px-2 py-0.5 font-weight-500" style="white-space: normal; text-align: left; display: inline-block; max-width: 230px; font-size: 0.72rem;" title="'.e($kk->kegiatan).' - Alokasi Bulan Ini: Rp '.number_format($kkTotal, 0, ',', '.').'"><i class="fas fa-link mr-1"></i>'.e($kk->description).' ('.e($kk->month).')</span>';
+
+                    // Hitung sisa anggaran kumulatif s.d. bulan terpilih / bulan transaksi
+                    $targetMonthNum = (! empty($month) && $month !== 'all')
+                        ? $this->resolveMonthNumber($month)
+                        : ($this->resolveMonthNumber($row->billing_month) ?: ($row->transaction_date ? (int) $row->transaction_date->format('m') : 12));
+
+                    $targetMonthPad = str_pad((string) $targetMonthNum, 2, '0', STR_PAD_LEFT);
+                    $targetMonthName = $this->indonesianMonths[$targetMonthPad] ?? ('Bulan '.$targetMonthNum);
+
+                    // Cocokkan item kertas kerja terkait
+                    $matchedKk = $utilityKkItems->filter(function ($item) use ($row, $kk) {
+                        if ($row->utility_profile_id && $item->utility_profile_id) {
+                            return (int) $item->utility_profile_id === (int) $row->utility_profile_id;
+                        }
+                        if ($item->kegiatan === $kk->kegiatan && $item->description === $kk->description) {
+                            return true;
+                        }
+
+                        return false;
+                    });
+
+                    $budgetYtd = (float) $matchedKk->filter(fn ($item) => $this->resolveMonthNumber($item->month) <= $targetMonthNum)->sum('total_amount');
+
+                    // Cocokkan realisasi pembayaran terkait s.d. target month
+                    $matchedKkIds = $matchedKk->pluck('id')->filter()->all();
+                    $matchedReceipts = $yearReceipts->filter(function ($item) use ($row, $matchedKkIds, $targetMonthNum) {
+                        $rM = $this->resolveMonthNumber($item->billing_month) ?: ($item->transaction_date ? (int) $item->transaction_date->format('m') : 0);
+                        if ($rM > $targetMonthNum) {
+                            return false;
+                        }
+                        if ($row->utility_profile_id && $item->utility_profile_id) {
+                            return (int) $item->utility_profile_id === (int) $row->utility_profile_id;
+                        }
+                        if ($item->bos_kertas_kerja_item_id && in_array($item->bos_kertas_kerja_item_id, $matchedKkIds)) {
+                            return true;
+                        }
+
+                        return false;
+                    });
+
+                    $spentYtd = (float) $matchedReceipts->sum('total_amount');
+                    $remainingYtd = $budgetYtd - $spentYtd;
+                    $isOverBudget = ($remainingYtd < 0);
+
+                    $budgetTooltip = 'Anggaran s.d. '.$targetMonthName.': Rp '.number_format($budgetYtd, 0, ',', '.').' | Terbayar s.d. '.$targetMonthName.': Rp '.number_format($spentYtd, 0, ',', '.');
+
+                    if ($isOverBudget) {
+                        $warningHtml = '<div class="mt-1" title="'.e($budgetTooltip).'">'.
+                            '<span class="badge badge-danger text-white px-1.5 py-0.5 font-weight-bold" style="background-color: #ef4444 !important; font-size: 0.69rem; display: inline-flex; align-items: center; gap: 3px;">'.
+                            '<i class="fas fa-exclamation-triangle"></i> Over: -Rp '.number_format(abs($remainingYtd), 0, ',', '.').' (s.d. '.$targetMonthName.')'.
+                            '</span>'.
+                            '</div>';
+                    } else {
+                        $warningHtml = '<div class="mt-1 font-tabular" style="font-size: 0.71rem; color: #16a34a;" title="'.e($budgetTooltip).'">'.
+                            '<i class="fas fa-check-circle mr-1"></i>Sisa Anggaran: <strong>Rp '.number_format($remainingYtd, 0, ',', '.').'</strong> (s.d. '.$targetMonthName.')'.
+                            '</div>';
+                    }
+
+                    $kkHtml = '<div class="mt-1">'.$badgeKk.$warningHtml.'</div>';
                 } elseif ($row->profile && ! $row->profile->is_budgeted) {
                     $kkHtml = '<div class="mt-1"><span class="badge badge-secondary px-2 py-0.5" style="font-size: 0.72rem;" title="SMP PGRI / Internal: Tidak dianggarkan BOS"><i class="fas fa-ban mr-1"></i>Non-BOS</span></div>';
                 } else {
@@ -312,7 +420,7 @@ class UtilityReceiptController extends Controller
                     $spin = $row->ocr_status === 'processing' ? ' fa-spin' : '';
                     $btnRetry = '<button type="button" class="btn btn-xs btn-outline-primary btn-retry-ocr mr-1" data-id="'.$row->id.'" title="Proses Ulang OCR"><i class="fas fa-sync-alt'.$spin.'"></i></button>';
                 }
-                $btnDelete = '<button type="button" class="btn btn-xs btn-danger btn-delete" data-id="'.$row->id.'" data-url="'.route('utility-receipts.destroy', $row->id).'" data-name="'.e($row->customer_name ?: 'Struk').'" title="Hapus"><i class="fas fa-trash"></i></button>';
+                $btnDelete = '<button type="button" class="btn btn-xs btn-danger btn-delete" data-id="'.$row->id.'" data-url="'.route('bos.utilitas.destroy', $row->id).'" data-name="'.e($row->customer_name ?: 'Struk').'" title="Hapus"><i class="fas fa-trash"></i></button>';
 
                 return '<div class="d-inline-flex align-items-center text-nowrap">'.$btnView.$btnEdit.$btnRetry.$btnDelete.'</div>';
             })
@@ -326,12 +434,12 @@ class UtilityReceiptController extends Controller
             'receipt_file' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf|max:20480',
             'image_base64' => 'nullable|string',
             'raw_text' => 'nullable|string',
-            'engine' => 'nullable|string|in:auto,local,ai',
+            'engine' => 'nullable|string|in:auto,local',
         ]);
 
         $file = $request->file('receipt_file') ?: $request->input('image_base64');
         $rawText = $request->input('raw_text');
-        $engine = $request->input('engine', 'auto');
+        $engine = $request->input('engine', 'local');
 
         if (! $file && empty($rawText)) {
             return response()->json([
@@ -431,6 +539,14 @@ class UtilityReceiptController extends Controller
             $profile = UtilityProfile::find($profileId);
             if ($profile && ! $profile->is_budgeted) {
                 $kertasKerjaItemId = null; // SMP PGRI / Non-BOS tidak boleh dihubungkan ke kertas kerja BOS
+            } elseif ($profile && $profile->is_budgeted && empty($kertasKerjaItemId)) {
+                // Auto-match ke kertas kerja item jika belum terisi
+                $kertasKerjaItemId = $this->findMatchingKertasKerjaItemId(
+                    (int) $profileId,
+                    (int) $validated['fiscal_year'],
+                    $validated['billing_month'],
+                    (float) ($validated['total_amount'] ?? 0)
+                );
             }
         }
         if ($kertasKerjaItemId) {
@@ -519,7 +635,7 @@ class UtilityReceiptController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => count($uploadedReceipts).' berkas struk berhasil diunggah dan dijadwalkan untuk diproses AI di latar belakang.',
+            'message' => count($uploadedReceipts).' berkas struk berhasil diunggah dan dijadwalkan untuk diproses di latar belakang.',
             'total_uploaded' => count($uploadedReceipts),
             'receipts' => $uploadedReceipts,
         ]);
@@ -572,7 +688,11 @@ class UtilityReceiptController extends Controller
             $monthReceiptsQuery->where(function ($q) use ($month, $monthName) {
                 $q->where('billing_month', $month)
                     ->orWhere('billing_month', $monthName)
-                    ->orWhereMonth('transaction_date', $month);
+                    ->orWhere(function ($sub) use ($month) {
+                        $sub->where(function ($emptyQ) {
+                            $emptyQ->whereNull('billing_month')->orWhere('billing_month', '');
+                        })->whereMonth('transaction_date', $month);
+                    });
             });
         }
         $monthReceipts = $monthReceiptsQuery->get();
@@ -629,7 +749,7 @@ class UtilityReceiptController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Pemindaian ulang AI berhasil dijadwalkan.',
+            'message' => 'Pemindaian ulang OCR berhasil dijadwalkan.',
             'receipt' => $receipt,
         ]);
     }
@@ -704,6 +824,13 @@ class UtilityReceiptController extends Controller
             $profile = UtilityProfile::find($profileId);
             if ($profile && ! $profile->is_budgeted) {
                 $kertasKerjaItemId = null; // SMP PGRI / Non-BOS tidak boleh dihubungkan ke kertas kerja BOS
+            } elseif ($profile && $profile->is_budgeted && empty($kertasKerjaItemId)) {
+                $kertasKerjaItemId = $this->findMatchingKertasKerjaItemId(
+                    (int) $profileId,
+                    (int) $validated['fiscal_year'],
+                    $validated['billing_month'],
+                    (float) ($validated['total_amount'] ?? 0)
+                );
             }
         }
         if ($kertasKerjaItemId) {
@@ -808,5 +935,123 @@ class UtilityReceiptController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Konversi string nama bulan atau angka bulan ke format integer 1..12
+     */
+    private function resolveMonthNumber(mixed $val): int
+    {
+        if (empty($val) || $val === 'all') {
+            return 0;
+        }
+
+        if (is_numeric($val)) {
+            $num = (int) $val;
+
+            return ($num >= 1 && $num <= 12) ? $num : 0;
+        }
+
+        $lower = strtolower(trim((string) $val));
+        $map = [
+            'januari' => 1, 'january' => 1, 'jan' => 1, '01' => 1, '1' => 1,
+            'februari' => 2, 'february' => 2, 'feb' => 2, '02' => 2, '2' => 2,
+            'maret' => 3, 'march' => 3, 'mar' => 3, '03' => 3, '3' => 3,
+            'april' => 4, 'apr' => 4, '04' => 4, '4' => 4,
+            'mei' => 5, 'may' => 5, '05' => 5, '5' => 5,
+            'juni' => 6, 'june' => 6, 'jun' => 6, '06' => 6, '6' => 6,
+            'juli' => 7, 'july' => 7, 'jul' => 7, '07' => 7, '7' => 7,
+            'agustus' => 8, 'august' => 8, 'agu' => 8, 'aug' => 8, '08' => 8, '8' => 8,
+            'september' => 9, 'sep' => 9, '09' => 9, '9' => 9,
+            'oktober' => 10, 'october' => 10, 'okt' => 10, 'oct' => 10, '10' => 10,
+            'november' => 11, 'nov' => 11, '11' => 11,
+            'desember' => 12, 'december' => 12, 'des' => 12, 'dec' => 12, '12' => 12,
+        ];
+
+        return $map[$lower] ?? 0;
+    }
+
+    /**
+     * Cari ID BosKertasKerjaItem yang paling cocok berdasarkan profil, tahun, bulan, dan nominal
+     */
+    public function findMatchingKertasKerjaItemId(int $profileId, int $fiscalYear, string $billingMonth, float $totalAmount = 0): ?int
+    {
+        $profile = UtilityProfile::find($profileId);
+        if (! $profile || ! $profile->is_budgeted) {
+            return null;
+        }
+
+        $monthNum = $this->resolveMonthNumber($billingMonth);
+        if ($monthNum < 1 || $monthNum > 12) {
+            return null;
+        }
+
+        $monthPad = str_pad((string) $monthNum, 2, '0', STR_PAD_LEFT);
+        $monthName = $this->indonesianMonths[$monthPad] ?? '';
+
+        // Prioritas 1: Cari yang eksplisit punya utility_profile_id cocok
+        $directMatch = BosKertasKerjaItem::where('utility_profile_id', $profileId)
+            ->where('year', $fiscalYear)
+            ->where(function ($q) use ($monthNum, $monthPad, $monthName) {
+                $q->where('month', $monthName)
+                    ->orWhere('month', $monthPad)
+                    ->orWhere('month', (string) $monthNum);
+            })
+            ->first();
+
+        if ($directMatch) {
+            return $directMatch->id;
+        }
+
+        // Prioritas 2: Fallback berdasarkan kategori profil dan kemiripan nominal jika profil belum terhubung di item
+        $category = $profile->category;
+        $query = BosKertasKerjaItem::whereNull('utility_profile_id')
+            ->where('year', $fiscalYear)
+            ->where(function ($q) use ($monthNum, $monthPad, $monthName) {
+                $q->where('month', $monthName)
+                    ->orWhere('month', $monthPad)
+                    ->orWhere('month', (string) $monthNum);
+            });
+
+        if ($category === 'internet') {
+            $query->where(function ($q) {
+                $q->where('kegiatan', 'like', '%jasa internet%')
+                    ->orWhere('program_code', 'like', '06.07.05%')
+                    ->orWhere('program_code', 'like', '07.06.05%');
+            });
+        } elseif ($category === 'telkom_speedy') {
+            $query->where(function ($q) {
+                $q->where('kegiatan', 'like', '%telepon%')
+                    ->orWhere('kegiatan', 'like', '%jasa internet%')
+                    ->orWhere('program_code', 'like', '06.07.04%')
+                    ->orWhere('program_code', 'like', '07.06.04%')
+                    ->orWhere('program_code', 'like', '06.07.05%')
+                    ->orWhere('program_code', 'like', '07.06.05%');
+            });
+        } else {
+            $query->where(function ($q) {
+                $q->where('kegiatan', 'like', '%listrik%')
+                    ->orWhere('program_code', 'like', '06.07.01%')
+                    ->orWhere('program_code', 'like', '07.06.01%');
+            });
+        }
+
+        $candidates = $query->get();
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        if ($candidates->count() === 1) {
+            return $candidates->first()->id;
+        }
+
+        // Jika ada banyak kandidat, pilih yang selisih nominalnya paling kecil
+        $closest = $candidates->sortBy(function ($item) use ($totalAmount) {
+            $itemTotal = (float) ($item->total_amount ?: ($item->price * ($item->volume ?: 1)));
+
+            return abs($itemTotal - $totalAmount);
+        })->first();
+
+        return $closest?->id;
     }
 }

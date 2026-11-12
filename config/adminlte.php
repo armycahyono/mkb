@@ -573,7 +573,7 @@ return [
     // Persist the collapsed state of the sidebar on the browser, so it
     // survives a page load (the AdminLTE push menu plugin takes care of it).
 
-    'sidebar_collapse_remember' => false,
+    'sidebar_collapse_remember' => true,
 
     // The breakpoint where the sidebar turns into an overlay. AdminLTE only
     // provides the 'sm', 'md', 'lg', 'xl' and 'xxl' stylesheets, so any other
@@ -608,7 +608,7 @@ return [
     // animation (a value that is not a number falls back to 300).
 
     'sidebar_nav_aria_label' => null,
-    'sidebar_nav_compact' => false,
+    'sidebar_nav_compact' => true,
     'sidebar_nav_indent' => false,
     'sidebar_nav_pills' => false,
     'sidebar_nav_accordion' => true,

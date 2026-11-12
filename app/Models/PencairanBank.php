@@ -62,6 +62,26 @@ class PencairanBank extends Model
         return TerbilangHelper::make($this->total_accounts);
     }
 
+    public function getKuasaLetterNumberAttribute(): string
+    {
+        $letterNumber = trim((string) $this->letter_number);
+        if ($letterNumber === '') {
+            return '';
+        }
+
+        $parts = explode('/', $letterNumber);
+        if (count($parts) >= 2) {
+            $seq = trim($parts[1]);
+            if (! str_contains($seq, '.')) {
+                $parts[1] = $seq.'.1';
+            }
+
+            return implode('/', $parts);
+        }
+
+        return str_contains($letterNumber, '.') ? $letterNumber : $letterNumber.'.1';
+    }
+
     public function scopeFunding($query, string $source)
     {
         return $query->where('funding_source', $source);

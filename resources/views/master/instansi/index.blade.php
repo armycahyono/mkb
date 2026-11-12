@@ -318,7 +318,7 @@ $(document).ready(function() {
         $('#importAlert').addClass('d-none').html('');
 
         $.ajax({
-            url: "{{ route('instansi.import', [], false) }}",
+            url: "{{ route('instansi.import') }}",
             type: "POST",
             data: formData,
             contentType: false,

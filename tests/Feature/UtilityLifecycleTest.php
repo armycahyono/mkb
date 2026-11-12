@@ -206,6 +206,8 @@ class UtilityLifecycleTest extends TestCase
                 $table->decimal('harga', 15, 2)->default(0);
                 $table->decimal('jumlah', 15, 2)->default(0);
                 $table->string('kegiatan')->nullable();
+                $table->string('kegiatan_sekolah')->nullable();
+                $table->unsignedBigInteger('kegiatan_sekolah_id')->nullable();
                 $table->string('kode_rekening', 50)->nullable();
                 $table->string('bulan_pakai', 50)->nullable();
                 $table->text('keterangan')->nullable();
@@ -219,6 +221,12 @@ class UtilityLifecycleTest extends TestCase
             if (! Schema::hasColumn('pengajuan_barangs', 'kode_rekening')) {
                 Schema::table('pengajuan_barangs', function (Blueprint $table) {
                     $table->string('kode_rekening', 50)->nullable();
+                });
+            }
+            if (! Schema::hasColumn('pengajuan_barangs', 'kegiatan_sekolah')) {
+                Schema::table('pengajuan_barangs', function (Blueprint $table) {
+                    $table->string('kegiatan_sekolah')->nullable();
+                    $table->unsignedBigInteger('kegiatan_sekolah_id')->nullable();
                 });
             }
         }
@@ -301,8 +309,17 @@ class UtilityLifecycleTest extends TestCase
                 $table->integer('year')->nullable();
                 $table->string('month', 50)->nullable();
                 $table->string('title')->nullable();
+                $table->string('type', 30)->default('belanja');
+                $table->unsignedBigInteger('supplier_id')->nullable();
+                $table->unsignedBigInteger('guru_id')->nullable();
+                $table->string('supplier_name', 150)->nullable();
+                $table->string('bank_name', 100)->nullable();
+                $table->string('account_number', 50)->nullable();
+                $table->date('planned_date')->nullable();
                 $table->string('status', 50)->default('draft');
                 $table->unsignedBigInteger('pencairan_bank_item_id')->nullable();
+                $table->text('notes')->nullable();
+                $table->unsignedBigInteger('created_by')->nullable();
                 $table->timestamps();
                 $table->softDeletes();
             });
@@ -314,8 +331,10 @@ class UtilityLifecycleTest extends TestCase
                 $table->unsignedBigInteger('bos_rencana_belanja_id');
                 $table->unsignedBigInteger('bos_kertas_kerja_item_id')->nullable();
                 $table->decimal('volume_plan', 10, 2)->default(0);
+                $table->string('unit', 50)->nullable();
                 $table->decimal('price', 15, 2)->default(0);
                 $table->decimal('total_amount', 15, 2)->default(0);
+                $table->string('spesifikasi', 255)->nullable();
                 $table->timestamps();
                 $table->softDeletes();
             });
@@ -366,6 +385,7 @@ class UtilityLifecycleTest extends TestCase
                 $table->id();
                 $table->unsignedBigInteger('utility_profile_id')->nullable();
                 $table->unsignedBigInteger('bos_kertas_kerja_item_id')->nullable();
+                $table->unsignedBigInteger('bos_rencana_belanja_id')->nullable();
                 $table->unsignedBigInteger('pencairan_bank_item_id')->nullable();
                 $table->integer('fiscal_year')->default(2026);
                 $table->string('billing_month', 50)->nullable();
@@ -376,6 +396,7 @@ class UtilityLifecycleTest extends TestCase
                 $table->string('customer_number', 100)->nullable();
                 $table->string('meter_number', 100)->nullable();
                 $table->string('tariff_power', 100)->nullable();
+                $table->string('token_number', 100)->nullable();
                 $table->decimal('kwh_amount', 12, 2)->nullable();
                 $table->decimal('base_amount', 15, 2)->default(0);
                 $table->decimal('tax_pbjt', 15, 2)->default(0);
@@ -388,6 +409,34 @@ class UtilityLifecycleTest extends TestCase
                 $table->text('notes')->nullable();
                 $table->timestamps();
                 $table->softDeletes();
+            });
+        }
+
+        if (! Schema::hasTable('suppliers')) {
+            Schema::create('suppliers', function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->string('type', 20)->default('offline');
+                $table->string('category', 50)->nullable();
+                $table->string('marketplace_name')->nullable();
+                $table->string('bank_name', 100)->nullable();
+                $table->string('account_number', 50)->nullable();
+                $table->string('account_holder', 150)->nullable();
+                $table->boolean('is_active')->default(true);
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
+
+        if (! Schema::hasTable('supplier_bank_accounts')) {
+            Schema::create('supplier_bank_accounts', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('supplier_id');
+                $table->string('bank_name', 100);
+                $table->string('account_number', 50);
+                $table->string('account_holder', 150)->nullable();
+                $table->boolean('is_primary')->default(false);
+                $table->timestamps();
             });
         }
 
@@ -565,8 +614,7 @@ class UtilityLifecycleTest extends TestCase
         $this->assertTrue((bool) $foundSmk['has_kertas_kerja']);
         $this->assertEquals('GURU PEMBAYAR LISTRIK', $foundSmk['recipient_name']);
 
-        $this->assertNotNull($foundSmp);
-        $this->assertFalse((bool) $foundSmp['is_budgeted']);
+        $this->assertNull($foundSmp, 'Tagihan utilitas khusus SMP PGRI tidak boleh muncul pada daftar tarik tagihan utilitas');
 
         // 6. Buat Surat TNT (Pencairan Bank) yang memuat reimburse kedua struk tersebut
         // Pengguna membulatkan nominal SMK dari 250.320 menjadi 250.000

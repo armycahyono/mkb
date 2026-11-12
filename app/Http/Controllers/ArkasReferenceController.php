@@ -85,7 +85,7 @@ class ArkasReferenceController extends Controller
         return DataTables::of($query)
             ->addIndexColumn()
             ->addColumn('snp_badge', function ($row) {
-                return '<span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" style="font-size: 0.76rem;">'.e($row->snp).'</span>';
+                return '<span class="text-secondary" style="font-size: 0.80rem; font-weight: normal; line-height: 1.35;">'.e($row->snp).'</span>';
             })
             ->addColumn('kode_kegiatan_display', function ($row) {
                 return '<span class="font-monospace fw-bold text-dark" style="letter-spacing: 0.5px;">'.e($row->kode_kegiatan).'</span>';
@@ -142,9 +142,9 @@ class ArkasReferenceController extends Controller
         return DataTables::of($query)
             ->addIndexColumn()
             ->addColumn('jenis_badge', function ($row) {
-                $color = strtolower($row->jenis_barang) === 'modal' ? 'badge-success' : 'badge-secondary';
+                $colorClass = strtolower($row->jenis_barang) === 'modal' ? 'text-success' : 'text-secondary';
 
-                return '<span class="badge '.$color.'" style="font-size: 0.65rem; font-weight: 600; padding: 2px 6px; letter-spacing: 0.3px;">'.e($row->jenis_barang).'</span>';
+                return '<span class="'.$colorClass.'" style="font-size: 0.80rem; font-weight: normal;">'.e($row->jenis_barang).'</span>';
             })
             ->addColumn('kode_rekening_display', function ($row) {
                 return '<span class="font-monospace text-secondary" style="font-size: 0.8125rem; letter-spacing: 0.3px;">'.e($row->kode_rekening).'</span>';

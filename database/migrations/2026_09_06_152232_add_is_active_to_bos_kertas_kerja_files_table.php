@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('bos_kertas_kerja_files', function (Blueprint $table) {
-            $table->boolean('is_active')->default(true)->after('description');
+            if (! Schema::hasColumn('bos_kertas_kerja_files', 'is_active')) {
+                $table->boolean('is_active')->default(true)->after('description');
+            }
         });
     }
 

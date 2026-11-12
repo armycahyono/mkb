@@ -174,9 +174,9 @@
             </div>
             @endif
 
-            {{-- Baris 1: Maksud Perjalanan Dinas (Satu Baris Penuh dengan Referensi Pintar) --}}
+            {{-- Baris 1: Maksud Dinas & Nomor Surat Tugas --}}
             <div class="row">
-                <div class="col-md-12">
+                <div class="col-md-8">
                     <div class="form-group mb-2">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <label class="small font-weight-bold text-dark mb-0">
@@ -205,6 +205,17 @@
                             @endforeach
                         </div>
                         @endif
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group mb-2">
+                        <label class="small font-weight-bold text-dark mb-1">
+                            Nomor Surat Tugas <small class="text-muted font-weight-normal">(Opsional)</small>
+                        </label>
+                        <input type="text" name="letter_number" id="letterNumber" class="form-control form-control-sm font-tabular" placeholder="Contoh: 094/082/101.6.21/2026" value="{{ old('letter_number') }}">
+                        <small class="text-muted d-block mt-1" style="font-size: 0.72rem;">
+                            <i class="fas fa-file-alt mr-1"></i>Nomor surat perintah tugas dinas
+                        </small>
                     </div>
                 </div>
             </div>
@@ -343,13 +354,13 @@
             <h6 class="card-title font-weight-bold text-dark mb-0 py-1" style="font-size: 0.90rem;">
                 <i class="fas fa-users text-success mr-1"></i> 2. Guru Peserta Perjadin & Rincian Kwitansi
             </h6>
-            <div class="d-flex align-items-center justify-content-end ms-auto ml-auto gap-2">
+            <div class="d-flex align-items-center justify-content-end ms-auto ml-auto gap-2 flex-wrap">
                 <span class="text-muted font-weight-bold me-1 mr-2 text-nowrap" style="font-size: 0.8125rem;">Standar Rp</span>
                 <input type="text" id="quickNominal" class="form-control form-control-sm font-tabular text-right font-weight-bold" style="width: 105px; font-size: 0.8125rem;" value="65.000" placeholder="65.000">
-                <button type="button" id="btnApplyAll" class="btn btn-sm btn-outline-primary font-weight-bold px-2 me-2 mr-3" style="font-size: 0.8125rem;" title="Terapkan nominal standar ini ke semua peserta">
+                <button type="button" id="btnApplyAll" class="btn btn-sm btn-outline-primary font-weight-bold px-2 me-2 mr-2" style="font-size: 0.8125rem;" title="Terapkan nominal standar ini ke semua peserta">
                     <i class="fas fa-check-double me-1 mr-1"></i> Terapkan
                 </button>
-                <div class="border-start border-left ps-3 pl-3 d-inline-block">
+                <div class="border-start border-left ps-2 pl-2 d-inline-block">
                     <button type="button" id="btnAddRow" class="btn btn-sm btn-success font-weight-bold shadow-sm px-3" style="font-size: 0.8125rem;">
                         <i class="fas fa-user-plus me-1 mr-1"></i> Tambah Peserta
                     </button>
@@ -418,7 +429,17 @@ function formatNumberRibuan(val) {
 
 function parseNumberRibuan(str) {
     if (typeof str === 'number') return Math.round(str);
-    let clean = String(str || '').replace(/[^\d]/g, '');
+    let s = String(str || '').trim();
+    if (!s) return 0;
+    // Format desimal standard JSON/DB (misal: "100000.00" atau "65000.50")
+    if (/^\d+\.\d{1,2}$/.test(s)) {
+        return Math.round(parseFloat(s));
+    }
+    // Format desimal Indonesia dengan koma (misal: "100.000,00")
+    if (s.includes(',')) {
+        s = s.split(',')[0];
+    }
+    let clean = s.replace(/[^\d]/g, '');
     return parseInt(clean, 10) || 0;
 }
 

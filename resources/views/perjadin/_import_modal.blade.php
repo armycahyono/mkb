@@ -33,6 +33,46 @@
                         </a>
                     </div>
 
+                    @php
+                        $activeYear = ($selectedYear && $selectedYear !== 'all') ? (int) $selectedYear : (int) session('fiscal_year', date('Y'));
+                        $activeKkItems = isset($kertasKerjaItems) ? $kertasKerjaItems->where('year', $activeYear) : collect([]);
+                    @endphp
+
+                    @if(isset($kertasKerjaItems) && $kertasKerjaItems->count() > 0)
+                    <div class="p-3 mb-3 rounded border" style="background-color: #f0fdf4; border-color: #86efac !important;">
+                        <div class="form-group mb-1">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="small font-weight-bold text-success mb-0">
+                                    <i class="fas fa-link mr-1"></i> Hubungkan ke Kertas Kerja (BOS) <small class="text-muted font-weight-normal">(Opsional)</small>:
+                                </label>
+                                <span class="badge bg-success text-white font-weight-normal" style="font-size: 0.72rem;">
+                                    <i class="fas fa-calendar-alt mr-1"></i> Tahun Anggaran: {{ $activeYear }}
+                                </span>
+                            </div>
+                            <select name="bos_kertas_kerja_item_id" id="importKertasKerjaItemId" class="form-control form-control-sm font-weight-500">
+                                <option value="">-- Tidak Dihubungkan / Input Bebas --</option>
+                                @foreach($activeKkItems as $kk)
+                                    @php
+                                        $remaining = isset($kk->available_volume) ? (float) $kk->available_volume : max(0, (float) $kk->volume - (float) $kk->realisasis->sum('volume'));
+                                        $isExhausted = ($remaining <= 0.001);
+                                    @endphp
+                                    <option value="{{ $kk->id }}" {{ $isExhausted ? 'disabled' : '' }}>
+                                        [{{ $kk->month }} {{ $kk->year }}] {{ $kk->kegiatan }} &mdash; {{ $kk->description }}
+                                        @if($isExhausted)
+                                            (⛔ HABIS - Sisa: 0 {{ $kk->unit }})
+                                        @else
+                                            (Tarif: Rp {{ number_format($kk->price, 0, ',', '.') }} / {{ $kk->unit }} | Sisa: {{ $remaining }} {{ $kk->unit }})
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <small class="text-muted d-block mt-1 font-italic" style="font-size: 0.74rem;">
+                            <i class="fas fa-info-circle mr-1"></i> Seluruh kegiatan perjalanan dinas dari file Excel ini akan otomatis dikaitkan ke pos Kertas Kerja yang dipilih dan mengisi kode rekening belanjanya.
+                        </small>
+                    </div>
+                    @endif
+
                     <div class="form-group mb-2">
                         <label class="font-weight-bold small">Pilih File Excel (.xlsx / .xls / .csv) <span class="text-danger">*</span></label>
                         <div class="custom-file">

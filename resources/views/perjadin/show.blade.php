@@ -86,6 +86,12 @@
             <div class="card-body p-3">
                 <table class="table table-sm table-borderless mb-0">
                     <tr>
+                        <td width="28%" class="text-muted small">Nomor SPPD / Realisasi:</td>
+                        <td>
+                            <span class="badge badge-light border text-primary font-tabular font-weight-bold" style="font-size: 0.80rem;">SPPD-{{ str_pad($perjadin->id, 4, '0', STR_PAD_LEFT) }}</span>
+                        </td>
+                    </tr>
+                    <tr>
                         <td width="28%" class="text-muted small">Tujuan Dinas:</td>
                         <td class="font-weight-bold text-dark">{{ $perjadin->destination_name }}</td>
                     </tr>
@@ -96,6 +102,10 @@
                     <tr>
                         <td class="text-muted small">Maksud Dinas:</td>
                         <td class="font-weight-500">{{ $perjadin->activity_purpose }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted small">Nomor Surat Tugas:</td>
+                        <td class="font-tabular font-weight-bold text-dark">{{ $perjadin->letter_number ?: '-' }}</td>
                     </tr>
                     @if($perjadin->kertasKerjaItem)
                     <tr>

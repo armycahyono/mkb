@@ -175,6 +175,8 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/next-nota', [BosPanduanBelanjaController::class, 'nextNotaNumber'])->name('next-nota');
             Route::get('/unrealized-data', [BosPanduanBelanjaController::class, 'unrealizedData'])->name('unrealized-data');
             Route::get('/groups-data', [BosPanduanBelanjaController::class, 'groupsData'])->name('groups-data');
+            Route::get('/export-unrealized', [BosPanduanBelanjaController::class, 'exportUnrealizedExcel'])->name('export-unrealized');
+            Route::get('/export-groups', [BosPanduanBelanjaController::class, 'exportGroupsExcel'])->name('export-groups');
             Route::post('/store-group', [BosPanduanBelanjaController::class, 'storeGroup'])->name('store-group');
             Route::get('/edit-group/{id}', [BosPanduanBelanjaController::class, 'editGroup'])->name('edit-group');
             Route::get('/show-group/{id}', [BosPanduanBelanjaController::class, 'showGroup'])->name('show-group');
@@ -182,6 +184,8 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/print/{id}', [BosPanduanBelanjaController::class, 'printGroup'])->name('print');
             Route::post('/convert/{id}', [BosPanduanBelanjaController::class, 'convertToRealisasi'])->name('convert');
             Route::post('/toggle-order/{id}', [BosPanduanBelanjaController::class, 'toggleOrderStatus'])->name('toggle-order');
+            Route::get('/utility-modal-data', [BosPanduanBelanjaController::class, 'getUtilityPaymentModalData'])->name('utility-modal-data');
+            Route::post('/store-utility-group', [BosPanduanBelanjaController::class, 'storeUtilityPaymentGroup'])->name('store-utility-group');
             Route::delete('/group/{id}', [BosPanduanBelanjaController::class, 'destroyGroup'])->name('destroy-group');
         });
 
@@ -190,6 +194,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('perjadin/import', [PerjadinController::class, 'import'])->name('perjadin.import');
         Route::patch('perjadin/{perjadin}/update-bku', [PerjadinController::class, 'updateBku'])->name('perjadin.update-bku');
         Route::post('perjadin/batch-update-bku', [PerjadinController::class, 'batchUpdateBku'])->name('perjadin.batch-update-bku');
+        Route::get('perjadin/print-batch', [PerjadinController::class, 'printBatchKwitansi'])->name('perjadin.print-batch');
         Route::resource('perjadin', PerjadinController::class);
         Route::get('perjadin/{perjadin}/print/{item?}', [PerjadinController::class, 'printKwitansi'])->name('perjadin.print');
 
@@ -277,6 +282,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('perjadin/import', [PerjadinController::class, 'import'])->name('perjadin.import');
         Route::patch('perjadin/{perjadin}/update-bku', [PerjadinController::class, 'updateBku'])->name('perjadin.update-bku');
         Route::post('perjadin/batch-update-bku', [PerjadinController::class, 'batchUpdateBku'])->name('perjadin.batch-update-bku');
+        Route::get('perjadin/print-batch', [PerjadinController::class, 'printBatchKwitansi'])->name('perjadin.print-batch');
         Route::resource('perjadin', PerjadinController::class);
         Route::get('perjadin/{perjadin}/print/{item?}', [PerjadinController::class, 'printKwitansi'])->name('perjadin.print');
 

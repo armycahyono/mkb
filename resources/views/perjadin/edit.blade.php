@@ -117,6 +117,34 @@
         </div>
     @endif
 
+    {{-- Status Banner Info TNT / Lunas --}}
+    @if($perjadin->status === 'diajukan_ke_bank' || $perjadin->tnt_letters->isNotEmpty())
+        <div class="alert py-2 px-3 mb-3 border-0 shadow-sm d-flex align-items-center" style="border-left: 4px solid #17a2b8 !important; background-color: #e0f2fe; color: #0369a1;">
+            <i class="fas fa-file-invoice-dollar fa-2x mr-3 text-info"></i>
+            <div>
+                <strong class="d-block" style="font-size: 0.88rem;"><i class="fas fa-info-circle mr-1"></i> Status: TNT (Sedang Diajukan ke Bank)</strong>
+                <span class="small" style="font-size: 0.80rem;">
+                    Perjalanan dinas ini sedang dalam proses pencairan bank dengan No. Surat TNT: 
+                    <strong>{{ $perjadin->tnt_letters->isNotEmpty() ? $perjadin->tnt_letters->implode(', ') : '-' }}</strong>.
+                    Status akan otomatis berubah menjadi <strong>Lunas</strong> setelah Surat TNT dikonfirmasi telah dicairkan oleh bank di menu Pencairan Bank.
+                </span>
+            </div>
+        </div>
+    @elseif($perjadin->status === 'lunas')
+        <div class="alert py-2 px-3 mb-3 border-0 shadow-sm d-flex align-items-center" style="border-left: 4px solid #28a745 !important; background-color: #dcfce7; color: #15803d;">
+            <i class="fas fa-check-circle fa-2x mr-3 text-success"></i>
+            <div>
+                <strong class="d-block" style="font-size: 0.88rem;"><i class="fas fa-check-double mr-1"></i> Status: Lunas</strong>
+                <span class="small" style="font-size: 0.80rem;">
+                    Kegiatan ini telah dicairkan/dibayarkan pada tanggal <strong>{{ $perjadin->payment_date ? $perjadin->payment_date->format('d/m/Y') : '-' }}</strong>
+                    @if($perjadin->tnt_letters->isNotEmpty())
+                        melalui Surat TNT: <strong>{{ $perjadin->tnt_letters->implode(', ') }}</strong>.
+                    @endif
+                </span>
+            </div>
+        </div>
+    @endif
+
     {{-- Card 1: Informasi Kegiatan Perjadin --}}
     <div class="card shadow-sm border-0 mb-3">
         <div class="card-header bg-white py-2 px-3 border-bottom">
@@ -173,9 +201,9 @@
             </div>
             @endif
 
-            {{-- Baris 1: Maksud Perjalanan Dinas (Satu Baris Penuh dengan Referensi Pintar) --}}
+            {{-- Baris 1: Maksud Dinas & Nomor Surat Tugas --}}
             <div class="row">
-                <div class="col-md-12">
+                <div class="col-md-8">
                     <div class="form-group mb-2">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <label class="small font-weight-bold text-dark mb-0">
@@ -204,6 +232,17 @@
                             @endforeach
                         </div>
                         @endif
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group mb-2">
+                        <label class="small font-weight-bold text-dark mb-1">
+                            Nomor Surat Tugas <small class="text-muted font-weight-normal">(Opsional)</small>
+                        </label>
+                        <input type="text" name="letter_number" id="letterNumber" class="form-control form-control-sm font-tabular" placeholder="Contoh: 094/082/101.6.21/2026" value="{{ old('letter_number', $perjadin->letter_number) }}">
+                        <small class="text-muted d-block mt-1" style="font-size: 0.72rem;">
+                            <i class="fas fa-file-alt mr-1"></i>Nomor surat perintah tugas dinas
+                        </small>
                     </div>
                 </div>
             </div>
@@ -275,10 +314,22 @@
                         <label class="small font-weight-bold text-dark mb-1">
                             Tanggal Bayar Kwitansi <small class="text-muted font-weight-normal">(Opsional)</small>
                         </label>
-                        <input type="date" name="payment_date" id="paymentDate" class="form-control form-control-sm font-tabular" value="{{ old('payment_date', $perjadin->payment_date ? $perjadin->payment_date->format('Y-m-d') : '') }}">
-                        <small class="text-muted d-block mt-1" style="font-size: 0.72rem;">
-                            <i class="fas fa-receipt mr-1"></i>Kosongkan jika menunggu pencairan bank
-                        </small>
+                        @if($perjadin->status === 'diajukan_ke_bank')
+                            <div class="input-group input-group-sm">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text bg-light text-info"><i class="fas fa-lock"></i></span>
+                                </div>
+                                <input type="text" class="form-control form-control-sm font-tabular bg-light text-muted" value="Menunggu Pencairan Bank (TNT)" readonly>
+                            </div>
+                            <small class="text-info d-block mt-1 font-weight-500" style="font-size: 0.72rem;">
+                                <i class="fas fa-info-circle mr-1"></i>Tanggal cair diatur otomatis saat Surat TNT dicairkan di menu Pencairan Bank
+                            </small>
+                        @else
+                            <input type="date" name="payment_date" id="paymentDate" class="form-control form-control-sm font-tabular" value="{{ old('payment_date', $perjadin->payment_date ? $perjadin->payment_date->format('Y-m-d') : '') }}">
+                            <small class="text-muted d-block mt-1" style="font-size: 0.72rem;">
+                                <i class="fas fa-receipt mr-1"></i>Kosongkan jika menunggu pencairan bank
+                            </small>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -430,7 +481,17 @@ function formatNumberRibuan(val) {
 
 function parseNumberRibuan(str) {
     if (typeof str === 'number') return Math.round(str);
-    let clean = String(str || '').replace(/[^\d]/g, '');
+    let s = String(str || '').trim();
+    if (!s) return 0;
+    // Format desimal standard JSON/DB (misal: "100000.00" atau "65000.50")
+    if (/^\d+\.\d{1,2}$/.test(s)) {
+        return Math.round(parseFloat(s));
+    }
+    // Format desimal Indonesia dengan koma (misal: "100.000,00")
+    if (s.includes(',')) {
+        s = s.split(',')[0];
+    }
+    let clean = s.replace(/[^\d]/g, '');
     return parseInt(clean, 10) || 0;
 }
 

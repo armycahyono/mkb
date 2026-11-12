@@ -98,6 +98,19 @@
     {{-- Base Meta Tags --}}
     <meta charset="utf-8">
 
+    {{-- MKB Compact Mode (Early init to prevent layout shift) --}}
+    <script>
+        try {
+            const savedCompact = localStorage.getItem('mkb_compact_mode');
+            const isLaptop = window.innerWidth <= 1366 || window.innerHeight <= 800;
+            if (savedCompact === 'true' || (savedCompact === null && isLaptop)) {
+                document.documentElement.classList.add('compact-mode');
+            } else if (savedCompact === 'false') {
+                document.documentElement.classList.add('compact-mode-off');
+            }
+        } catch(e) {}
+    </script>
+
     @if(config('adminlte.color_mode.no_flash_script', true))
         {{-- Theme Init (prevents a flash of the incorrect color mode on load) --}}
         <script>
@@ -586,20 +599,23 @@
 
         /* ── Content header ───────────────────────────── */
         .content-header {
-            padding: 24px 28px 8px !important;
+            padding: 4px 10px !important;
         }
         .content-header h1 {
-            font-size: 1.35rem !important;
+            font-size: 1.05rem !important;
             font-weight: 700 !important;
             color: var(--mkb-text) !important;
-            letter-spacing: -0.02em !important;
+            letter-spacing: -0.015em !important;
             margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1.15 !important;
         }
         .content-header .breadcrumb {
             background: transparent !important;
             margin: 0 !important;
             padding: 0 !important;
-            font-size: 0.78rem !important;
+            font-size: 12px !important;
+            line-height: 1.2 !important;
         }
 
         /* ── Cards ────────────────────────────────────── */
@@ -781,20 +797,20 @@
 
         /* ── Table inside card ────────────────────────── */
         .mkb-table th {
-            font-size: 0.72rem;
+            font-size: 11px !important;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
             color: var(--mkb-text-light);
             border-bottom: 1px solid var(--mkb-border) !important;
-            padding: 10px 16px !important;
+            padding: 6px 10px !important;
             background: #FAFBFD !important;
         }
         .mkb-table td {
-            font-size: 0.86rem;
+            font-size: 12px !important;
             color: var(--mkb-text);
             border-bottom: 1px solid var(--mkb-border) !important;
-            padding: 12px 16px !important;
+            padding: 5px 8px !important;
             vertical-align: middle !important;
         }
         .mkb-table tr:last-child td { border-bottom: none !important; }
@@ -809,14 +825,14 @@
         table.dataTable thead th,
         table.dataTable thead td,
         .table thead th {
-            font-size: 0.78rem !important;
+            font-size: 11px !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
-            letter-spacing: 0.05em !important;
+            letter-spacing: 0.04em !important;
             color: var(--mkb-text-light) !important;
             background: #FAFBFD !important;
             vertical-align: middle !important;
-            padding: 8px 10px !important;
+            padding: 6px 8px !important;
             border-bottom: 1px solid var(--mkb-border) !important;
             white-space: nowrap !important;
         }
@@ -1097,11 +1113,60 @@
         .border-left { border-left: 1px solid #dee2e6 !important; }
         .border-right { border-right: 1px solid #dee2e6 !important; }
 
-        /* Global Header Actions Spacing */
+        /* Global Header Actions Spacing & Wrap */
         .header-actions {
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        /* ── Responsive Enhancements ── */
+        .table-responsive {
+            -webkit-overflow-scrolling: touch;
+        }
+
+        @media (max-width: 767.98px) {
+            .content-header .d-flex.justify-content-between,
+            .content-header .row {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 0.5rem;
+            }
+            .header-actions {
+                width: 100%;
+                justify-content: flex-start;
+                margin-top: 0.5rem !important;
+            }
+            .dataTables_wrapper .dataTables_length,
+            .dataTables_wrapper .dataTables_filter {
+                float: none !important;
+                text-align: left !important;
+                margin-bottom: 0.5rem;
+            }
+            .dataTables_wrapper .dataTables_filter input {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin-left: 0 !important;
+                display: block;
+                margin-top: 0.25rem;
+            }
+            .dataTables_wrapper .dataTables_paginate {
+                float: none !important;
+                text-align: center !important;
+                margin-top: 0.5rem;
+                display: flex;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            .dataTables_wrapper .dataTables_info {
+                text-align: center !important;
+                float: none !important;
+            }
+            .modal-dialog {
+                margin: 0.5rem !important;
+                max-width: calc(100% - 1rem) !important;
+            }
         }
 
         /* ── Universal High-Contrast Badges (Zero White Text) ── */
@@ -1155,6 +1220,354 @@
             background-color: #fce7f3 !important;
             color: #9d174d !important;
             border: 1px solid #fbcfe8 !important;
+        }
+
+        /* ══════════════════════════════════════════════════════════════════
+           DESAIN GLOBAL: JUDUL, BREADCRUMB & STANDARISASI TABEL (MAKS 12PX)
+           ══════════════════════════════════════════════════════════════════ */
+
+        /* Content Header (Judul & Breadcrumb): Ramping, 12px, tanpa icon, spasi sempit */
+        .content-header {
+            padding: 4px 10px !important;
+            margin-bottom: 0 !important;
+        }
+        .content-header h1,
+        h1.page-title,
+        .page-title {
+            font-size: 1.05rem !important;
+            line-height: 1.15 !important;
+            margin-bottom: 0px !important;
+            padding-bottom: 0px !important;
+        }
+        .content-header nav,
+        .content-header nav[aria-label="breadcrumb"] {
+            margin-top: 0px !important;
+            padding-top: 0px !important;
+            line-height: 1.15 !important;
+        }
+        .content-header .breadcrumb,
+        .breadcrumb {
+            font-size: 12px !important;
+            line-height: 1.2 !important;
+            margin-top: 0px !important;
+            margin-bottom: 0px !important;
+            padding-top: 0px !important;
+            padding-bottom: 0px !important;
+        }
+        .content-header .breadcrumb .breadcrumb-item,
+        .breadcrumb .breadcrumb-item,
+        .content-header .breadcrumb .breadcrumb-item a,
+        .breadcrumb .breadcrumb-item a {
+            font-size: 12px !important;
+            line-height: 1.2 !important;
+        }
+        /* Tanpa icon pada breadcrumb di bawah judul */
+        .content-header .breadcrumb i,
+        .content-header .breadcrumb svg,
+        .breadcrumb i,
+        .breadcrumb svg {
+            display: none !important;
+        }
+
+        /* ══════════════════════════════════════════════════════════════════
+           HIERARKI TIPOGRAFI TABEL (MAKSIMAL 12PX STANDARISASI GLOBAL)
+           ══════════════════════════════════════════════════════════════════ */
+
+        /* 1. Teks Data Utama Sel Tabel: Tepat & Maksimal 12px */
+        .table,
+        table.dataTable,
+        .mkb-table,
+        .table tbody td,
+        table.dataTable tbody td,
+        .table td,
+        table.dataTable td,
+        .mkb-table td {
+            font-size: 12px !important;
+            line-height: 1.25 !important;
+        }
+
+        /* Seluruh teks direct dan nested dalam tabel tidak boleh lebih dari 12px */
+        .table td a,
+        table.dataTable td a,
+        .table td span:not(.badge):not(.subtext),
+        table.dataTable td span:not(.badge):not(.subtext),
+        .table td div:not(.small):not(.text-muted),
+        table.dataTable td div:not(.small):not(.text-muted),
+        .table td strong,
+        table.dataTable td strong,
+        .table td b,
+        table.dataTable td b,
+        .table td p,
+        table.dataTable td p {
+            font-size: 12px !important;
+            line-height: 1.25 !important;
+        }
+
+        /* 2. Header Kolom Tabel (th): 11px Uppercase Rapi & Tegas */
+        .table th,
+        table.dataTable th,
+        .mkb-table th,
+        .table thead th,
+        table.dataTable thead th {
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.25px !important;
+            text-transform: uppercase !important;
+            line-height: 1.25 !important;
+        }
+
+        /* 3. Teks Sekunder di dalam Tabel (Keterangan, NIP, Subtext, Detail): 10.5px */
+        .table td small,
+        table.dataTable td small,
+        .table td .small,
+        table.dataTable td .small,
+        .table td .text-muted,
+        table.dataTable td .text-muted,
+        .table td .subtext,
+        table.dataTable td .subtext,
+        .table td .desc,
+        table.dataTable td .desc {
+            font-size: 10.5px !important;
+            line-height: 1.2 !important;
+        }
+
+        /* 4. Kode Akun / No BKU / No SPPD / Nomor Surat: 11px */
+        .table td code,
+        table.dataTable td code,
+        .table td kbd,
+        table.dataTable td kbd,
+        .table td .font-monospace {
+            font-size: 11px !important;
+            padding: 1px 4px !important;
+        }
+
+        /* 5. Badge Status di dalam Tabel: 10px */
+        .table td .badge,
+        table.dataTable td .badge,
+        .table th .badge,
+        table.dataTable th .badge {
+            font-size: 10px !important;
+            padding: 1.5px 5px !important;
+            line-height: 1.15 !important;
+            letter-spacing: 0.2px !important;
+            font-weight: 600 !important;
+        }
+
+        /* 6. Tombol Aksi di dalam Sel Tabel: 10.5px */
+        .table td .btn,
+        table.dataTable td .btn {
+            font-size: 10.5px !important;
+            padding: 1px 4px !important;
+            line-height: 1.2 !important;
+        }
+
+        /* 7. Ikon di dalam Sel & Tombol Tabel: 10.5px - 11px */
+        .table td .btn i,
+        table.dataTable td .btn i,
+        .table td i,
+        table.dataTable td i,
+        .table td svg,
+        table.dataTable td svg {
+            font-size: 11px !important;
+        }
+
+        /* Ikon emoji / icon kustom di tabel agar tidak melonjak besar */
+        .table td .mr-1[style*="font-size"],
+        .table td span[style*="font-size"] {
+            font-size: 12px !important;
+        }
+
+        /* ══════════════════════════════════════════════════════════════════
+           MODE RAMPING / KOMPAK (PENGHEMAT RUANG UNTUK LAPTOP & TOGGLE)
+           ══════════════════════════════════════════════════════════════════ */
+
+        /* Ketika class .compact-mode aktif (secara manual maupun otomatis pada laptop) */
+        html.compact-mode .app-header.navbar,
+        body.compact-mode .app-header.navbar {
+            min-height: 40px !important;
+            padding-top: 2px !important;
+            padding-bottom: 2px !important;
+        }
+        html.compact-mode .app-header.navbar .nav-link,
+        body.compact-mode .app-header.navbar .nav-link {
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
+        }
+
+        html.compact-mode .card,
+        body.compact-mode .card {
+            margin-bottom: 0.55rem !important;
+        }
+        html.compact-mode .card-header,
+        body.compact-mode .card-header {
+            padding: 0.35rem 0.60rem !important;
+            min-height: 35px !important;
+        }
+        html.compact-mode .card-header .card-title,
+        body.compact-mode .card-header .card-title,
+        html.compact-mode .card-header h3.card-title,
+        body.compact-mode .card-header h3.card-title,
+        html.compact-mode .card-header h6.card-title,
+        body.compact-mode .card-header h6.card-title {
+            font-size: 0.84rem !important;
+            margin-bottom: 0 !important;
+        }
+        html.compact-mode .card-body,
+        body.compact-mode .card-body {
+            padding: 0.45rem 0.60rem !important;
+        }
+
+        html.compact-mode .table tbody td,
+        html.compact-mode table.dataTable tbody td,
+        html.compact-mode .table td,
+        html.compact-mode table.dataTable td,
+        html.compact-mode .mkb-table td,
+        body.compact-mode .table tbody td,
+        body.compact-mode table.dataTable tbody td,
+        body.compact-mode .table td,
+        body.compact-mode table.dataTable td,
+        body.compact-mode .mkb-table td {
+            padding: 0.22rem 0.40rem !important;
+        }
+        html.compact-mode .table th,
+        html.compact-mode table.dataTable th,
+        html.compact-mode .mkb-table th,
+        html.compact-mode .table thead th,
+        html.compact-mode table.dataTable thead th,
+        body.compact-mode .table th,
+        body.compact-mode table.dataTable th,
+        body.compact-mode .mkb-table th,
+        body.compact-mode .table thead th,
+        body.compact-mode table.dataTable thead th {
+            padding: 0.28rem 0.40rem !important;
+        }
+
+        html.compact-mode .btn-sm,
+        html.compact-mode .btn-group-sm > .btn,
+        body.compact-mode .btn-sm,
+        body.compact-mode .btn-group-sm > .btn {
+            padding: 0.18rem 0.45rem !important;
+            font-size: 0.75rem !important;
+            line-height: 1.2 !important;
+            min-height: 26px !important;
+        }
+        html.compact-mode .form-control-sm,
+        html.compact-mode .form-select-sm,
+        body.compact-mode .form-control-sm,
+        body.compact-mode .form-select-sm {
+            padding: 0.18rem 0.38rem !important;
+            font-size: 0.75rem !important;
+            height: auto !important;
+            min-height: 26px !important;
+        }
+
+        html.compact-mode .stat-card,
+        body.compact-mode .stat-card {
+            padding: 0.45rem 0.65rem !important;
+        }
+        html.compact-mode .stat-value,
+        body.compact-mode .stat-value {
+            font-size: 1.15rem !important;
+        }
+        html.compact-mode .stat-label,
+        body.compact-mode .stat-label {
+            font-size: 0.68rem !important;
+        }
+
+        html.compact-mode .dataTables_wrapper .dataTables_length,
+        html.compact-mode .dataTables_wrapper .dataTables_filter,
+        html.compact-mode .dt-container .dt-length,
+        html.compact-mode .dt-container .dt-search,
+        body.compact-mode .dataTables_wrapper .dataTables_length,
+        body.compact-mode .dataTables_wrapper .dataTables_filter,
+        body.compact-mode .dt-container .dt-length,
+        body.compact-mode .dt-container .dt-search {
+            margin-bottom: 0.15rem !important;
+        }
+        html.compact-mode .dataTables_wrapper .dataTables_info,
+        html.compact-mode .dataTables_wrapper .dataTables_paginate,
+        html.compact-mode .dt-container .dt-info,
+        html.compact-mode .dt-container .dt-paging,
+        body.compact-mode .dataTables_wrapper .dataTables_info,
+        body.compact-mode .dataTables_wrapper .dataTables_paginate,
+        body.compact-mode .dt-container .dt-info,
+        body.compact-mode .dt-container .dt-paging {
+            margin-top: 0.15rem !important;
+            padding-top: 0.1rem !important;
+        }
+
+        html.compact-mode .badge,
+        body.compact-mode .badge {
+            font-size: 0.66rem !important;
+            padding: 2px 5px !important;
+        }
+
+        /* Mode Otomatis Layar Laptop (media query fallback jika belum dimatikan manual) */
+        @media screen and (max-width: 1366px), screen and (max-height: 800px) {
+            html:not(.compact-mode-off) .app-header.navbar {
+                min-height: 40px !important;
+                padding-top: 2px !important;
+                padding-bottom: 2px !important;
+            }
+            html:not(.compact-mode-off) .app-header.navbar .nav-link {
+                padding-top: 4px !important;
+                padding-bottom: 4px !important;
+            }
+            html:not(.compact-mode-off) .card {
+                margin-bottom: 0.55rem !important;
+            }
+            html:not(.compact-mode-off) .card-header {
+                padding: 0.35rem 0.60rem !important;
+                min-height: 35px !important;
+            }
+            html:not(.compact-mode-off) .card-header .card-title,
+            html:not(.compact-mode-off) .card-header h3.card-title,
+            html:not(.compact-mode-off) .card-header h6.card-title {
+                font-size: 0.84rem !important;
+                margin-bottom: 0 !important;
+            }
+            html:not(.compact-mode-off) .card-body {
+                padding: 0.45rem 0.60rem !important;
+            }
+            html:not(.compact-mode-off) .table tbody td,
+            html:not(.compact-mode-off) table.dataTable tbody td,
+            html:not(.compact-mode-off) .table td,
+            html:not(.compact-mode-off) table.dataTable td,
+            html:not(.compact-mode-off) .mkb-table td {
+                padding: 0.22rem 0.40rem !important;
+            }
+            html:not(.compact-mode-off) .table th,
+            html:not(.compact-mode-off) table.dataTable th,
+            html:not(.compact-mode-off) .mkb-table th,
+            html:not(.compact-mode-off) .table thead th,
+            html:not(.compact-mode-off) table.dataTable thead th {
+                padding: 0.28rem 0.40rem !important;
+            }
+            html:not(.compact-mode-off) .btn-sm,
+            html:not(.compact-mode-off) .btn-group-sm > .btn {
+                padding: 0.18rem 0.45rem !important;
+                font-size: 0.75rem !important;
+                min-height: 26px !important;
+            }
+            html:not(.compact-mode-off) .form-control-sm,
+            html:not(.compact-mode-off) .form-select-sm {
+                padding: 0.18rem 0.38rem !important;
+                font-size: 0.75rem !important;
+                min-height: 26px !important;
+            }
+            html:not(.compact-mode-off) .stat-card {
+                padding: 0.45rem 0.65rem !important;
+            }
+            html:not(.compact-mode-off) .stat-value {
+                font-size: 1.15rem !important;
+            }
+            html:not(.compact-mode-off) .stat-label {
+                font-size: 0.68rem !important;
+            }
+            html:not(.compact-mode-off) .badge {
+                font-size: 0.66rem !important;
+                padding: 2px 5px !important;
+            }
         }
     </style>
 </head>
@@ -1255,7 +1668,7 @@
                         OverlayScrollbarsGlobal?.OverlayScrollbars !== undefined &&
                         !isMobile
                     ) {
-                        OverlayScrollbarsGlobal.OverlayScrollbars(sidebarWrapper, {
+                        window._sidebarOsInstance = OverlayScrollbarsGlobal.OverlayScrollbars(sidebarWrapper, {
                             scrollbars: {
                                 theme: Default.scrollbarTheme,
                                 autoHide: Default.scrollbarAutoHide,
@@ -1263,10 +1676,128 @@
                             },
                         });
                     }
+
+                    if (typeof window._restoreMkbSidebarPosition === 'function') {
+                        window._restoreMkbSidebarPosition();
+                    }
                 });
             })();
         </script>
     @endif
+
+    {{-- MKB Sidebar Auto Remember Position & Scroll Persistence --}}
+    <script>
+        (function() {
+            const STORAGE_SCROLL = 'mkb_sidebar_scroll_pos';
+            const STORAGE_HREF = 'mkb_sidebar_active_href';
+
+            function getSidebarViewport() {
+                const wrapper = document.querySelector('.sidebar-wrapper');
+                if (!wrapper) return null;
+                return wrapper.querySelector('.os-viewport') || wrapper;
+            }
+
+            function saveSidebarPosition() {
+                const vp = getSidebarViewport();
+                if (vp) {
+                    sessionStorage.setItem(STORAGE_SCROLL, vp.scrollTop);
+                }
+            }
+
+            function restoreSidebarPosition(isInitial = false) {
+                const wrapper = document.querySelector('.sidebar-wrapper');
+                if (!wrapper) return;
+                const vp = getSidebarViewport();
+                if (!vp) return;
+
+                // 1. Ensure any parent treeviews of active links are open
+                const activeLink = wrapper.querySelector('.nav-link.active');
+                if (activeLink) {
+                    let parent = activeLink.closest('.nav-treeview');
+                    while (parent) {
+                        const parentItem = parent.closest('.nav-item');
+                        if (parentItem) {
+                            parentItem.classList.add('menu-open');
+                            const parentLink = parentItem.querySelector(':scope > .nav-link');
+                            if (parentLink) parentLink.classList.add('active');
+                            parent.style.display = 'block';
+                        }
+                        parent = parentItem ? parentItem.parentElement.closest('.nav-treeview') : null;
+                    }
+                }
+
+                // 2. Determine scroll restoration target
+                const savedPos = sessionStorage.getItem(STORAGE_SCROLL);
+                const clickedHref = sessionStorage.getItem(STORAGE_HREF);
+                let restored = false;
+
+                if (savedPos !== null && !isNaN(parseInt(savedPos, 10)) && parseInt(savedPos, 10) > 0) {
+                    const targetTop = parseInt(savedPos, 10);
+                    let matchesClicked = false;
+                    if (clickedHref) {
+                        try {
+                            const parsedClicked = new URL(clickedHref, window.location.origin).pathname;
+                            if (parsedClicked === window.location.pathname) {
+                                matchesClicked = true;
+                            }
+                        } catch (e) {}
+                    }
+
+                    if (matchesClicked || !activeLink) {
+                        vp.scrollTop = targetTop;
+                        restored = true;
+                    }
+                }
+
+                // If not restored via savedPos or if no savedPos, scroll active link into view
+                if (!restored && activeLink) {
+                    activeLink.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+                    saveSidebarPosition();
+                }
+
+                // 3. Attach scroll listener once viewport exists
+                if (vp && !vp._mkbScrollListening) {
+                    vp._mkbScrollListening = true;
+                    let scrollTimer;
+                    vp.addEventListener('scroll', function() {
+                        clearTimeout(scrollTimer);
+                        scrollTimer = setTimeout(saveSidebarPosition, 100);
+                    }, { passive: true });
+                }
+            }
+
+            window._restoreMkbSidebarPosition = restoreSidebarPosition;
+
+            // Track sidebar link clicks to remember exact clicked position
+            document.addEventListener('click', function(e) {
+                const navLink = e.target.closest('.sidebar-wrapper .nav-link');
+                if (navLink) {
+                    const vp = getSidebarViewport();
+                    if (vp) {
+                        sessionStorage.setItem(STORAGE_SCROLL, vp.scrollTop);
+                    }
+                    const href = navLink.getAttribute('href');
+                    if (href && href !== '#' && href !== 'javascript:void(0)') {
+                        sessionStorage.setItem(STORAGE_HREF, href);
+                    }
+                }
+            }, true);
+
+            window.addEventListener('beforeunload', saveSidebarPosition);
+
+            // Execute restoration at key lifecycle moments
+            document.addEventListener('DOMContentLoaded', function() {
+                restoreSidebarPosition(true);
+                setTimeout(restoreSidebarPosition, 60);
+                setTimeout(restoreSidebarPosition, 200);
+                setTimeout(restoreSidebarPosition, 350);
+            });
+
+            window.addEventListener('load', function() {
+                setTimeout(restoreSidebarPosition, 100);
+            });
+        })();
+    </script>
 
     {{-- Extra Configured Plugins Scripts --}}
     @include('adminlte::plugins', ['type' => 'js'])
@@ -1377,6 +1908,125 @@
             if (banner) banner.classList.remove('show');
             localStorage.setItem('mkb_pwa_dismissed', 'true');
         });
+    </script>
+
+    {{-- MKB Compact Mode Toggle Script --}}
+    <script>
+        (function() {
+            const STORAGE_KEY = 'mkb_compact_mode';
+
+            function isLaptopScreen() {
+                return window.innerWidth <= 1366 || window.innerHeight <= 800;
+            }
+
+            function getStoredCompactState() {
+                try {
+                    return localStorage.getItem(STORAGE_KEY);
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function isCompactActive() {
+                const stored = getStoredCompactState();
+                if (stored === 'true') return true;
+                if (stored === 'false') return false;
+                return isLaptopScreen();
+            }
+
+            function updateButtonUI(isActive) {
+                const btn = document.getElementById('btnToggleCompactMode');
+                const statusEl = document.getElementById('compactModeStatus');
+                const iconEl = document.getElementById('compactModeIcon');
+                if (!btn) return;
+
+                if (isActive) {
+                    btn.style.background = '#e0f2fe';
+                    btn.style.borderColor = '#7dd3fc';
+                    btn.style.color = '#0369a1';
+                    if (statusEl) {
+                        statusEl.textContent = 'Aktif';
+                        statusEl.className = 'text-primary fw-bold';
+                    }
+                    if (iconEl) {
+                        iconEl.className = 'fas fa-compress-arrows-alt me-1 mr-1 text-primary';
+                    }
+                    btn.title = 'Mode Kompak Aktif (Klik untuk mematikan mode ramping)';
+                } else {
+                    btn.style.background = '#f8fafc';
+                    btn.style.borderColor = '#e2e8f0';
+                    btn.style.color = '#475569';
+                    if (statusEl) {
+                        statusEl.textContent = 'Off';
+                        statusEl.className = 'text-secondary';
+                    }
+                    if (iconEl) {
+                        iconEl.className = 'fas fa-expand-arrows-alt me-1 mr-1 text-secondary';
+                    }
+                    btn.title = 'Mode Kompak Nonaktif (Klik untuk mengaktifkan mode hemat ruang)';
+                }
+            }
+
+            function applyCompactMode(isActive) {
+                const html = document.documentElement;
+                const body = document.body;
+                if (isActive) {
+                    html.classList.add('compact-mode');
+                    html.classList.remove('compact-mode-off');
+                    if (body) {
+                        body.classList.add('compact-mode');
+                        body.classList.remove('compact-mode-off');
+                    }
+                } else {
+                    html.classList.remove('compact-mode');
+                    html.classList.add('compact-mode-off');
+                    if (body) {
+                        body.classList.remove('compact-mode');
+                        body.classList.add('compact-mode-off');
+                    }
+                }
+                updateButtonUI(isActive);
+            }
+
+            function toggleCompactMode() {
+                const currentActive = isCompactActive();
+                const newActive = !currentActive;
+                try {
+                    localStorage.setItem(STORAGE_KEY, newActive ? 'true' : 'false');
+                } catch (e) {}
+                applyCompactMode(newActive);
+
+                // Auto adjust DataTables column header alignment on compact toggle
+                setTimeout(function() {
+                    window.dispatchEvent(new Event('resize'));
+                    if (window.jQuery && $.fn && $.fn.dataTable) {
+                        try {
+                            $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+                        } catch(err) {}
+                    }
+                }, 100);
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                const active = isCompactActive();
+                applyCompactMode(active);
+
+                const toggleBtn = document.getElementById('btnToggleCompactMode');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        toggleCompactMode();
+                    });
+                }
+            });
+
+            window.addEventListener('resize', function() {
+                const stored = getStoredCompactState();
+                if (stored === null) {
+                    applyCompactMode(isLaptopScreen());
+                }
+            });
+        })();
     </script>
 
     {{-- Custom Scripts --}}

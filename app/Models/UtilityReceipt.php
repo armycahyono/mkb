@@ -41,6 +41,7 @@ class UtilityReceipt extends Model
         'ocr_error_message',
         'ocr_processed_at',
         'bos_kertas_kerja_item_id',
+        'bos_rencana_belanja_id',
         'pencairan_bank_item_id',
         'is_paid',
         'payment_date',
@@ -73,6 +74,11 @@ class UtilityReceipt extends Model
     public function kertasKerjaItem(): BelongsTo
     {
         return $this->belongsTo(BosKertasKerjaItem::class, 'bos_kertas_kerja_item_id');
+    }
+
+    public function rencanaBelanja(): BelongsTo
+    {
+        return $this->belongsTo(BosRencanaBelanja::class, 'bos_rencana_belanja_id');
     }
 
     public function pencairanBankItem(): BelongsTo
@@ -122,8 +128,8 @@ class UtilityReceipt extends Model
     {
         return match ($this->ocr_status) {
             'completed' => '<span class="badge badge-success text-white px-2 py-1" style="font-size: 0.72rem;"><i class="fas fa-check-circle mr-1"></i>Selesai</span>',
-            'processing' => '<span class="badge badge-info text-white px-2 py-1" style="font-size: 0.72rem;"><i class="fas fa-spinner fa-spin mr-1"></i>Memindai AI</span>',
-            'pending' => '<span class="badge badge-warning text-dark px-2 py-1" style="font-size: 0.72rem;"><i class="fas fa-clock mr-1"></i>Menunggu AI</span>',
+            'processing' => '<span class="badge badge-info text-white px-2 py-1" style="font-size: 0.72rem;"><i class="fas fa-spinner fa-spin mr-1"></i>Memindai</span>',
+            'pending' => '<span class="badge badge-warning text-dark px-2 py-1" style="font-size: 0.72rem;"><i class="fas fa-clock mr-1"></i>Menunggu</span>',
             'failed' => '<span class="badge badge-danger text-white px-2 py-1" style="font-size: 0.72rem;"><i class="fas fa-exclamation-triangle mr-1"></i>Perlu Manual</span>',
             'manual' => '<span class="badge badge-secondary text-white px-2 py-1" style="font-size: 0.72rem;"><i class="fas fa-keyboard mr-1"></i>Manual</span>',
             default => '<span class="badge badge-light text-muted px-2 py-1" style="font-size: 0.72rem;">'.($this->ocr_status ?: 'Unknown').'</span>',

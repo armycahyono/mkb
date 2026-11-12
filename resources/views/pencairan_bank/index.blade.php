@@ -138,20 +138,12 @@
                     <div>
                         <h5 class="font-weight-bold text-dark mb-1" style="font-size: 0.95rem;">
                             <i class="fas fa-exclamation-triangle text-warning mr-1"></i>
-                            @if($unpaidItemsCount > 0 && $unpaidRencanaCount > 0 && $unpaidUtilityCount > 0)
-                                Ada Perjalanan Dinas, Rencana Belanja, dan Utilitas yang Belum Masuk Daftar TNT
-                            @elseif($unpaidItemsCount > 0 && $unpaidRencanaCount > 0)
+                            @if($unpaidItemsCount > 0 && $unpaidRencanaCount > 0)
                                 Ada Perjalanan Dinas dan Rencana Belanja yang Belum Masuk Daftar TNT
-                            @elseif($unpaidItemsCount > 0 && $unpaidUtilityCount > 0)
-                                Ada Perjalanan Dinas dan Tagihan Utilitas yang Belum Masuk Daftar TNT
-                            @elseif($unpaidRencanaCount > 0 && $unpaidUtilityCount > 0)
-                                Ada Rencana Belanja dan Tagihan Utilitas yang Belum Masuk Daftar TNT
                             @elseif($unpaidItemsCount > 0)
                                 Ada Perjalanan Dinas yang Belum Masuk Daftar TNT
                             @elseif($unpaidRencanaCount > 0)
                                 Ada Rencana Belanja yang Belum Masuk Daftar TNT
-                            @elseif($unpaidUtilityCount > 0)
-                                Ada Tagihan Utilitas yang Belum Masuk Daftar TNT
                             @else
                                 Ada Tagihan Tertunda yang Belum Masuk Daftar TNT
                             @endif
@@ -164,9 +156,6 @@
                                 @endif
                                 @if($unpaidRencanaCount > 0)
                                     <span class="badge badge-primary" style="font-size: 0.76rem;"><i class="fas fa-cart-shopping mr-1"></i>Rencana Belanja: {{ $unpaidRencanaCount }} paket/nota &bull; Rp {{ number_format($unpaidRencanaTotalAmount, 0, ',', '.') }}</span>
-                                @endif
-                                @if($unpaidUtilityCount > 0)
-                                    <span class="badge badge-warning text-dark" style="font-size: 0.76rem;"><i class="fas fa-bolt mr-1"></i>Utilitas: {{ $unpaidUtilityCount }} tagihan &bull; Rp {{ number_format($unpaidUtilityTotalAmount, 0, ',', '.') }}</span>
                                 @endif
                             </span>
                         </p>
@@ -314,15 +303,6 @@
                         </a>
                     </li>
                     @endif
-                    @if($unpaidUtilityCount > 0)
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link py-1 px-3 {{ ($unpaidItemsCount === 0 && $unpaidRencanaCount === 0) ? 'active' : '' }}" id="tab-utilitas-btn" data-bs-toggle="pill" data-toggle="pill" href="#tab-unpaid-utilitas" role="tab" style="font-size: 0.8125rem; font-weight: 600;">
-                            <i class="fas fa-bolt mr-1"></i> Tagihan Utilitas
-                            <span class="badge badge-light font-tabular ml-1">{{ $unpaidUtilityCount }}</span>
-                            <small class="d-none d-sm-inline opacity-75 font-tabular ml-1">(Rp {{ number_format($unpaidUtilityTotalAmount, 0, ',', '.') }})</small>
-                        </a>
-                    </li>
-                    @endif
                 </ul>
 
                 <div class="tab-content" id="unpaidTabsContent">
@@ -397,7 +377,9 @@
                                             <td class="font-tabular">{{ $nota->planned_date ? $nota->planned_date->format('d/m/Y') : '-' }}</td>
                                             <td>
                                                 <div class="font-weight-500 text-dark">{{ $nota->title }}</div>
-                                                @if($isOnline)
+                                                @if($nota->type === 'utilitas')
+                                                    <small class="badge badge-warning text-dark"><i class="fas fa-bolt mr-1"></i>Utilitas</small>
+                                                @elseif($isOnline)
                                                     <small class="badge badge-warning text-dark"><i class="fas fa-store mr-1"></i>Online / Siplah</small>
                                                 @endif
                                             </td>
@@ -420,57 +402,6 @@
                         </div>
                     </div>
                     @endif
-
-                    {{-- Tab 3: Tagihan Utilitas --}}
-                    @if($unpaidUtilityCount > 0)
-                    <div class="tab-pane fade {{ ($unpaidItemsCount === 0 && $unpaidRencanaCount === 0) ? 'show active' : '' }}" id="tab-unpaid-utilitas" role="tabpanel">
-                        <div class="table-responsive" style="max-height: 380px;">
-                            <table class="table table-sm table-hover table-bordered mb-0" style="font-size: 0.78rem;">
-                                <thead class="bg-light text-dark">
-                                    <tr>
-                                        <th width="4%" class="text-center">No</th>
-                                        <th width="14%">Tgl Bayar</th>
-                                        <th width="24%">Objek Tagihan</th>
-                                        <th width="24%">Kertas Kerja (BOS)</th>
-                                        <th width="18%">Periode</th>
-                                        <th width="16%" class="text-right">Nominal Riil</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($unpaidUtilityReceipts as $idx => $receipt)
-                                        <tr>
-                                            <td class="text-center font-tabular align-middle">{{ $idx + 1 }}</td>
-                                            <td class="align-middle font-tabular">
-                                                {{ $receipt->transaction_date ? $receipt->transaction_date->format('d/m/Y') : '-' }}
-                                            </td>
-                                            <td class="align-middle">
-                                                <span class="font-weight-bold text-dark">{{ $receipt->profile?->name ?? 'Utilitas' }}</span>
-                                                @if(! ($receipt->profile?->is_budgeted ?? true))
-                                                    <span class="badge badge-secondary ml-1">Non-Anggaran</span>
-                                                @endif
-                                            </td>
-                                            <td class="align-middle">
-                                                @if($receipt->kertasKerjaItem)
-                                                    <span class="font-weight-500 text-dark">{{ $receipt->kertasKerjaItem->description }}</span>
-                                                @elseif(! ($receipt->profile?->is_budgeted ?? true))
-                                                    <span class="text-muted small"><em>Non-BOS (Internal)</em></span>
-                                                @else
-                                                    <span class="badge badge-warning text-dark"><i class="fas fa-exclamation-circle mr-1"></i>Belum Terhubung</span>
-                                                @endif
-                                            </td>
-                                            <td class="align-middle">
-                                                {{ $receipt->billing_month ?: '-' }} {{ $receipt->fiscal_year }}
-                                            </td>
-                                            <td class="text-right align-middle font-tabular font-weight-bold text-dark">
-                                                Rp {{ number_format($receipt->total_amount, 0, ',', '.') }}
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    @endif
                 </div>
             </div>
             <div class="modal-footer py-2 d-flex justify-content-between flex-wrap" style="gap: 8px;">
@@ -483,11 +414,6 @@
                     @if($unpaidRencanaCount > 0 && \Illuminate\Support\Facades\Route::has('bos.panduan.index'))
                         <a href="{{ route('bos.panduan.index') }}" class="btn btn-sm btn-outline-secondary">
                             <i class="fas fa-cart-shopping mr-1"></i> Buka Rencana Belanja
-                        </a>
-                    @endif
-                    @if($unpaidUtilityCount > 0 && \Illuminate\Support\Facades\Route::has('bos.utilitas.index'))
-                        <a href="{{ route('bos.utilitas.index') }}" class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-bolt mr-1"></i> Buka Struk Utilitas
                         </a>
                     @endif
                 </div>

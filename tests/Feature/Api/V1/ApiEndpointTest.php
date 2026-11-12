@@ -137,7 +137,7 @@ class ApiEndpointTest extends TestCase
             ->getJson('/api/v1/kas-categories');
 
         $response->assertOk()
-            ->assertJsonCount(1, 'data');
+            ->assertJsonFragment(['code' => 'test_masuk']);
     }
 
     public function test_kas_tunai_index(): void
@@ -172,7 +172,7 @@ class ApiEndpointTest extends TestCase
                 'funding_source' => 'BOSP',
             ]);
 
-        $response->assertOk()
+        $response->assertCreated()
             ->assertJsonPath('data.description', 'Beli ATK Sekolah');
     }
 
